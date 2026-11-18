@@ -1,6 +1,6 @@
 import { Scene } from "phaser"
 import { Bullet } from "./bullets"
-import { Player } from "./player"
+import { Player, type PlayerCharacter } from "./player"
 import { Slime } from "./slime"
 import { Companion } from "./companion"
 
@@ -14,8 +14,8 @@ type MansionSpawn =
 
 export class GameScene extends Scene {
   private player!: Player
-  private rian!: Companion
-  private lira!: Companion
+  private companions: Companion[] = []
+  private partyCharacter: PlayerCharacter | null = null
   private slime?: Slime
   private readonly bullets: Bullet[] = []
   private attackKey!: Phaser.Input.Keyboard.Key
@@ -89,6 +89,11 @@ export class GameScene extends Scene {
     this.attackKey = keyboard.addKey("SPACE")
 
     this.createMap()
+
+    keyboard.once("keydown-M", () => {
+      this.scene.pause("GameScene")
+      this.scene.launch("PartyMenu")
+    })
   }
 
   private createMap(): void {
@@ -131,13 +136,14 @@ export class GameScene extends Scene {
 
     const spawn = this.getSpawnPosition()
 
-    this.player = new Player(this, spawn.x, spawn.y)
+    const activeCharacter = this.registry.get(
+      "activeCharacter",
+    ) as PlayerCharacter
 
-    this.rian = new Companion(this, spawn.x - 60, spawn.y + 55, "rian", -1)
+    this.player = new Player(this, spawn.x, spawn.y, activeCharacter)
 
-    this.lira = new Companion(this, spawn.x + 60, spawn.y + 55, "lira", 1)
-    this.playerLayer.add(this.rian.sprite)
-    this.playerLayer.add(this.lira.sprite)
+    this.syncParty(spawn.x, spawn.y)
+
     this.playerLayer.add(this.player.sprite)
 
     this.physics.add.collider(this.player.sprite, this.collisionLayer)
@@ -166,6 +172,51 @@ export class GameScene extends Scene {
     }
 
     this.createTransitionZones()
+  }
+
+  private syncParty(spawnX: number, spawnY: number): void {
+    const activeCharacter = this.registry.get(
+      "activeCharacter",
+    ) as PlayerCharacter
+
+    if (this.partyCharacter === activeCharacter) {
+      return
+    }
+
+    this.partyCharacter = activeCharacter
+    this.companions.forEach((companion) => {
+      companion.sprite.destroy()
+    })
+    this.companions = []
+
+    const party: Array<"kael" | "rian" | "lira"> = ["kael", "rian", "lira"]
+
+    const companions = party.filter(
+      (character) => character !== activeCharacter,
+    )
+
+    companions.forEach((character, index) => {
+      const side: -1 | 1 = index === 0 ? -1 : 1
+
+      const companion = new Companion(
+        this,
+        spawnX + side * 60,
+        spawnY + 55,
+        character,
+        side,
+      )
+
+      this.companions.push(companion)
+      this.playerLayer.add(companion.sprite)
+      this.physics.add.collider(companion.sprite, this.collisionLayer)
+    })
+
+    if (this.companions.length === 2) {
+      this.physics.add.collider(
+        this.companions[0].sprite,
+        this.companions[1].sprite,
+      )
+    }
   }
 
   private getSpawnPosition(): { x: number; y: number } {
@@ -288,9 +339,22 @@ export class GameScene extends Scene {
   }
 
   update(): void {
+    const activeCharacter = this.registry.get(
+      "activeCharacter",
+    ) as PlayerCharacter
+
+    if (this.player.getCharacter() !== activeCharacter) {
+      this.player.setCharacter(activeCharacter)
+    }
+
     this.player.update()
-    this.rian.update(this.player.sprite)
-    this.lira.update(this.player.sprite)
+    if (this.partyCharacter !== activeCharacter) {
+      this.syncParty(this.player.sprite.x, this.player.sprite.y)
+    }
+
+    this.companions.forEach((companion) => {
+      companion.update(this.player.sprite)
+    })
 
     if (this.slime?.sprite.active) {
       this.slime.update(this.player.sprite)

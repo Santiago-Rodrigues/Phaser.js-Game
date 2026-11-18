@@ -3,7 +3,7 @@ export class Companion {
 
   private readonly stopDistance = 68
   private readonly followSpeed = 140
-  private readonly textureKey: "rian" | "lira"
+  private readonly textureKey: "kael" | "rian" | "lira"
   private readonly side: -1 | 1
   private readonly formationDistance = 75
 
@@ -11,7 +11,7 @@ export class Companion {
     scene: Phaser.Scene,
     x: number,
     y: number,
-    textureKey: "rian" | "lira",
+    textureKey: "kael" | "rian" | "lira",
     side: -1 | 1,
   ) {
     this.textureKey = textureKey

@@ -1,14 +1,21 @@
 import { Controls } from "./controls"
 
+export type PlayerCharacter = "kael" | "rian" | "lira"
 export class Player {
   readonly sprite: Phaser.Physics.Arcade.Sprite
+  character: PlayerCharacter
 
   private readonly controls: Controls
   private readonly speed = 180
   private facing: "up" | "down" | "left" | "right" = "down"
 
-  constructor(scene: Phaser.Scene, x: number, y: number) {
-    this.sprite = scene.physics.add.sprite(x, y, "kael")
+  constructor(
+    scene: Phaser.Scene,
+    x: number,
+    y: number,
+    character: PlayerCharacter,
+  ) {
+    this.sprite = scene.physics.add.sprite(x, y, character)
 
     this.sprite.setScale(0.08)
     this.sprite.setSize(620, 760)
@@ -16,6 +23,12 @@ export class Player {
 
     this.sprite.setCollideWorldBounds(true)
     this.controls = new Controls(scene)
+
+    this.character = character
+  }
+
+  getCharacter(): PlayerCharacter {
+    return this.character
   }
 
   update(): void {
@@ -43,6 +56,9 @@ export class Player {
   getFacing(): "up" | "down" | "left" | "right" {
     return this.facing
   }
-}
 
-export type PlayerCharacter = "kael" | "rian" | "lira"
+  setCharacter(character: PlayerCharacter): void {
+    this.character = character
+    this.sprite.setTexture(character)
+  }
+}

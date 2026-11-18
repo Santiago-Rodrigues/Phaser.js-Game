@@ -40,7 +40,8 @@ export class GameScene extends Scene {
 
   preload(): void {
     this.load.image("mansion-collider", "assets/mansion/bloco_colisao.png")
-
+    this.load.image("kael", "assets/protagonists/Kael.png")
+    
     if (this.currentMap === "boss") {
       this.load.image("boss-background", "assets/mansion/sala_boss.png")
       this.load.tilemapTiledJSON(

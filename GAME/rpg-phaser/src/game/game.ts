@@ -19,6 +19,7 @@ export class GameScene extends Scene {
   private slime?: Slime
   private readonly bullets: Bullet[] = []
   private attackKey!: Phaser.Input.Keyboard.Key
+  private interactKey!: Phaser.Input.Keyboard.Key
   private nextShotAt = 0
   private collisionLayer!:
     | Phaser.Tilemaps.TilemapLayer
@@ -27,6 +28,13 @@ export class GameScene extends Scene {
   private transitioning = false
   private playerLayer!: Phaser.GameObjects.Container
   private projectileLayer!: Phaser.GameObjects.Container
+  private activeTransition?: { target: string; label: string }
+  private transitionZones: Array<{
+    zone: Phaser.GameObjects.Zone
+    label: Phaser.GameObjects.Text
+    target: string
+  }> = []
+  private interactWasDown = false
 
   constructor() {
     super("GameScene")
@@ -39,6 +47,8 @@ export class GameScene extends Scene {
 
     this.companions = []
     this.partyCharacter = null
+    this.transitionZones = []
+    this.interactWasDown = false
 
     if (data.spawn) {
       this.registry.set("mansionSpawn", data.spawn)
@@ -108,6 +118,7 @@ export class GameScene extends Scene {
     }
 
     this.attackKey = keyboard.addKey("SPACE")
+    this.interactKey = keyboard.addKey("E")
 
     this.createMap()
 
@@ -287,35 +298,81 @@ export class GameScene extends Scene {
     const zone = this.add.zone(x, y, width, height)
     this.physics.add.existing(zone, true)
 
-    this.physics.add.overlap(this.player.sprite, zone, () => {
-      if (this.transitioning) {
-        return
-      }
+    const label = this.add
+      .text(x, y - height / 2 - 24, "E  Interagir", {
+        fontFamily: "Arial",
+        fontSize: "18px",
+        color: "#ffffff",
+        backgroundColor: "#20263a",
+        padding: { x: 10, y: 6 },
+      })
+      .setOrigin(0.5)
+      .setDepth(100)
+      .setVisible(false)
 
-      this.transitioning = true
+    this.transitionZones.push({ zone, label, target })
+  }
 
-      if (target === "bossToCorridor1") {
-        this.scene.restart({
-          map: "corridor1",
-          spawn: "corridor1Top",
-        })
-      } else if (target === "corridor1ToBoss") {
-        this.scene.restart({
-          map: "boss",
-          spawn: "bossBottom",
-        })
-      } else if (target === "corridor1ToCorridor2") {
-        this.scene.restart({
-          map: "corridor2",
-          spawn: "corridor2Top",
-        })
-      } else if (target === "corridor2ToCorridor1") {
-        this.scene.restart({
-          map: "corridor1",
-          spawn: "corridor1Bottom",
-        })
+  private updateTransitionInteraction(): void {
+    let closestTarget: string | undefined
+    let closestPrompt: Phaser.GameObjects.Text | undefined
+    let closestDistance = Number.POSITIVE_INFINITY
+
+    this.transitionZones.forEach(({ zone, label, target }) => {
+      const bounds = zone.getBounds()
+      const isInside = bounds.contains(
+        this.player.sprite.x,
+        this.player.sprite.y,
+      )
+
+      label.setVisible(isInside)
+
+      if (isInside) {
+        const distanceX = this.player.sprite.x - zone.x
+        const distanceY = this.player.sprite.y - zone.y
+        const distance = Math.hypot(distanceX, distanceY)
+
+        if (distance < closestDistance) {
+          closestDistance = distance
+          closestTarget = target
+          closestPrompt = label
+        }
       }
     })
+
+    this.activeTransition = closestTarget
+      ? { target: closestTarget, label: closestPrompt?.text ?? "E  Interagir" }
+      : undefined
+  }
+
+  private transitionTo(target: string): void {
+    if (this.transitioning) {
+      return
+    }
+
+    this.transitioning = true
+
+    if (target === "bossToCorridor1") {
+      this.scene.restart({
+        map: "corridor1",
+        spawn: "corridor1Top",
+      })
+    } else if (target === "corridor1ToBoss") {
+      this.scene.restart({
+        map: "boss",
+        spawn: "bossBottom",
+      })
+    } else if (target === "corridor1ToCorridor2") {
+      this.scene.restart({
+        map: "corridor2",
+        spawn: "corridor2Top",
+      })
+    } else if (target === "corridor2ToCorridor1") {
+      this.scene.restart({
+        map: "corridor1",
+        spawn: "corridor1Bottom",
+      })
+    }
   }
 
   private shoot(): void {
@@ -381,6 +438,20 @@ export class GameScene extends Scene {
     if (this.attackKey.isDown) {
       this.shoot()
     }
+
+    this.updateTransitionInteraction()
+
+    const interactPressed = this.interactKey.isDown
+
+    if (
+      this.activeTransition &&
+      interactPressed &&
+      !this.interactWasDown
+    ) {
+      this.transitionTo(this.activeTransition.target)
+    }
+
+    this.interactWasDown = interactPressed
 
     for (let index = this.bullets.length - 1; index >= 0; index -= 1) {
       const bullet = this.bullets[index]

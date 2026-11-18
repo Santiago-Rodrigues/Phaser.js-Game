@@ -11,13 +11,12 @@ export class Player {
     this.sprite = scene.physics.add.sprite(x, y, "kael")
 
     this.sprite.setScale(0.08)
-    this.sprite.setSize(420, 700)
-    this.sprite.setOffset(302, 280)
+    this.sprite.setSize(620, 820)
+    this.sprite.setOffset(202, 160)
 
     this.sprite.setCollideWorldBounds(true)
     this.controls = new Controls(scene)
   }
-
 
   update(): void {
     const movement = this.controls.getMovement()

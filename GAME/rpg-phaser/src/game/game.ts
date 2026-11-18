@@ -2,6 +2,7 @@ import { Scene } from "phaser"
 import { Bullet } from "./bullets"
 import { Player } from "./player"
 import { Slime } from "./slime"
+import { Companion } from "./companion"
 
 type MansionMap = "boss" | "corridor1" | "corridor2"
 type MansionSpawn =
@@ -12,6 +13,8 @@ type MansionSpawn =
 
 export class GameScene extends Scene {
   private player!: Player
+  private rian!: Companion
+  private lira!: Companion
   private slime?: Slime
   private readonly bullets: Bullet[] = []
   private attackKey!: Phaser.Input.Keyboard.Key
@@ -41,7 +44,11 @@ export class GameScene extends Scene {
   preload(): void {
     this.load.image("mansion-collider", "assets/mansion/bloco_colisao.png")
     this.load.image("kael", "assets/protagonists/Kael.png")
-    
+    this.load.image("rian", "assets/protagonists/Rian.png")
+    this.load.image("slime", "assets/npcs/enemies/Slime.png")
+
+    this.load.image("lira", "assets/protagonists/Lira.png")
+
     if (this.currentMap === "boss") {
       this.load.image("boss-background", "assets/mansion/sala_boss.png")
       this.load.tilemapTiledJSON(
@@ -120,8 +127,19 @@ export class GameScene extends Scene {
     const spawn = this.getSpawnPosition()
 
     this.player = new Player(this, spawn.x, spawn.y)
+
+    this.rian = new Companion(this, spawn.x - 60, spawn.y + 55, "rian", -1)
+
+    this.lira = new Companion(this, spawn.x + 60, spawn.y + 55, "lira", 1)
+    this.playerLayer.add(this.rian.sprite)
+    this.playerLayer.add(this.lira.sprite)
     this.playerLayer.add(this.player.sprite)
+
     this.physics.add.collider(this.player.sprite, this.collisionLayer)
+    this.physics.add.collider(this.rian.sprite, this.collisionLayer)
+    this.physics.add.collider(this.lira.sprite, this.collisionLayer)
+
+    this.physics.add.collider(this.rian.sprite, this.lira.sprite)
 
     this.cameras.main.setBounds(0, 0, map.widthInPixels, map.heightInPixels)
 
@@ -266,6 +284,8 @@ export class GameScene extends Scene {
 
   update(): void {
     this.player.update()
+    this.rian.update(this.player.sprite)
+    this.lira.update(this.player.sprite)
 
     if (this.slime?.sprite.active) {
       this.slime.update(this.player.sprite)

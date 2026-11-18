@@ -17,13 +17,36 @@ export class Companion {
     this.textureKey = textureKey
     this.side = side
     this.sprite = scene.physics.add.sprite(x, y, this.textureKey)
+    this.sprite.setOrigin(0.5, 0.5)
     this.sprite.setScale(0.28)
-    this.sprite.setSize(200, 220)
-    this.sprite.setOffset(28, 36)
-    this.sprite.setFrame(0)
     this.sprite.setCollideWorldBounds(true)
 
+    this.setCenteredFrame(0)
     this.sprite.setVelocity(0, 0)
+  }
+
+  private setCenteredFrame(frame: number): void {
+    const visualCenters: Record<number, { x: number; y: number }> = {
+      0: { x: 283.7, y: 137.8 },
+      1: { x: 173.9, y: 139.2 },
+      2: { x: 51.0, y: 141.4 },
+      3: { x: 282.8, y: 123.8 },
+      4: { x: 172.1, y: 129.8 },
+      5: { x: 53.7, y: 133.6 },
+      6: { x: 281.3, y: 123.2 },
+      7: { x: 167.8, y: 121.6 },
+      8: { x: 54.1, y: 115.0 },
+      9: { x: 283.2, y: 104.2 },
+      10: { x: 175.2, y: 103.8 },
+      11: { x: 53.3, y: 100.2 },
+    }
+
+    const center = visualCenters[frame]
+    this.sprite.setFrame(frame)
+
+    if (center) {
+      this.sprite.setOrigin(center.x / 341, center.y / 256)
+    }
   }
 
   update(target: Phaser.Physics.Arcade.Sprite): void {
@@ -51,10 +74,19 @@ export class Companion {
       (distanceY / distance) * this.followSpeed,
     )
 
+    const frameIndex =
+      Math.floor(this.sprite.scene.time.now / 150) % 3
+
     if (Math.abs(distanceX) > Math.abs(distanceY)) {
-      this.sprite.setFrame(distanceX > 0 ? 3 : 6)
+      const frames = distanceX > 0
+        ? [3, 4, 5]
+        : [6, 7, 8]
+      this.setCenteredFrame(frames[frameIndex])
     } else {
-      this.sprite.setFrame(distanceY > 0 ? 0 : 9)
+      const frames = distanceY > 0
+        ? [0, 1, 2]
+        : [9, 10, 11]
+      this.setCenteredFrame(frames[frameIndex])
     }
   }
 }

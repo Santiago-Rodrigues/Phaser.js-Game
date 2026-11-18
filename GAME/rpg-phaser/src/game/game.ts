@@ -200,6 +200,11 @@ export class GameScene extends Scene {
       return
     }
 
+    this.companions.forEach((companion) => {
+      companion.sprite.destroy()
+    })
+    this.companions = []
+
     this.partyCharacter = activeCharacter
 
     const party: Array<"kael" | "rian" | "lira"> = ["kael", "rian", "lira"]

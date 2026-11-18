@@ -11,8 +11,8 @@ export class Player {
     this.sprite = scene.physics.add.sprite(x, y, "kael")
 
     this.sprite.setScale(0.08)
-    this.sprite.setSize(620, 820)
-    this.sprite.setOffset(202, 160)
+    this.sprite.setSize(620, 760)
+    this.sprite.setOffset(202, 200)
 
     this.sprite.setCollideWorldBounds(true)
     this.controls = new Controls(scene)
@@ -44,3 +44,5 @@ export class Player {
     return this.facing
   }
 }
+
+export type PlayerCharacter = "kael" | "rian" | "lira"

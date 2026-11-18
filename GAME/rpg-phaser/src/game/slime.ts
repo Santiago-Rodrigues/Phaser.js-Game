@@ -10,8 +10,8 @@ export class Slime {
     this.sprite.setCollideWorldBounds(true)
 
     this.sprite.setScale(0.07)
-    this.sprite.setSize(850, 850)
-    this.sprite.setOffset(193, 210)
+    this.sprite.setSize(850, 820)
+    this.sprite.setOffset(193, 230)
   }
 
   update(player: Phaser.Physics.Arcade.Sprite): void {

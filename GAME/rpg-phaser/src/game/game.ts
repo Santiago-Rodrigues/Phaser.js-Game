@@ -4,6 +4,7 @@ import { Player } from "./player"
 import { Slime } from "./slime"
 import { Companion } from "./companion"
 
+type PartyCharacter = "kael" | "rian" | "lira"
 type MansionMap = "boss" | "corridor1" | "corridor2"
 type MansionSpawn =
   | "bossBottom"
@@ -76,6 +77,10 @@ export class GameScene extends Scene {
     this.cameras.main.setBackgroundColor("#101820")
 
     const keyboard = this.input.keyboard
+
+    if (!this.registry.has("activeCharacter")) {
+      this.registry.set("activeCharacter", "kael")
+    }
 
     if (!keyboard) {
       throw new Error("O teclado não está disponível nesta cena.")

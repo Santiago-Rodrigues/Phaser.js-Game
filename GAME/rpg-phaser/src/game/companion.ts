@@ -17,13 +17,20 @@ export class Companion {
     this.textureKey = textureKey
     this.side = side
     this.sprite = scene.physics.add.sprite(x, y, this.textureKey)
-    this.sprite.setScale(0.08)
-    this.sprite.setSize(620, 760)
-    this.sprite.setOffset(202, 200)
+    this.sprite.setScale(0.28)
+    this.sprite.setSize(200, 220)
+    this.sprite.setOffset(28, 36)
+    this.sprite.setFrame(0)
     this.sprite.setCollideWorldBounds(true)
+
+    this.sprite.setVelocity(0, 0)
   }
 
   update(target: Phaser.Physics.Arcade.Sprite): void {
+    if (!this.sprite.active || !this.sprite.body) {
+      return
+    }
+
     const targetOffsetX = this.side * this.formationDistance
     const targetOffsetY = this.formationDistance * 0.65
 
@@ -43,5 +50,11 @@ export class Companion {
       (distanceX / distance) * this.followSpeed,
       (distanceY / distance) * this.followSpeed,
     )
+
+    if (Math.abs(distanceX) > Math.abs(distanceY)) {
+      this.sprite.setFrame(distanceX > 0 ? 3 : 6)
+    } else {
+      this.sprite.setFrame(distanceY > 0 ? 0 : 9)
+    }
   }
 }

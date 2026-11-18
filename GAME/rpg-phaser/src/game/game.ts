@@ -37,6 +37,9 @@ export class GameScene extends Scene {
     this.transitioning = false
     this.bullets.length = 0
 
+    this.companions = []
+    this.partyCharacter = null
+
     if (data.spawn) {
       this.registry.set("mansionSpawn", data.spawn)
     }
@@ -44,11 +47,29 @@ export class GameScene extends Scene {
 
   preload(): void {
     this.load.image("mansion-collider", "assets/mansion/bloco_colisao.png")
-    this.load.image("kael", "assets/protagonists/Kael.png")
-    this.load.image("rian", "assets/protagonists/Rian.png")
-    this.load.image("slime", "assets/npcs/enemies/Slime.png")
+    this.load.spritesheet("kael", "assets/protagonists/Kael.png", {
+      frameWidth: 341,
+      frameHeight: 256,
+    })
 
-    this.load.image("lira", "assets/protagonists/Lira.png")
+    this.load.spritesheet("rian", "assets/protagonists/Rian.png", {
+      frameWidth: 341,
+      frameHeight: 256,
+    })
+
+    this.load.spritesheet("lira", "assets/protagonists/Lira.png", {
+      frameWidth: 341,
+      frameHeight: 256,
+    })
+    this.load.spritesheet("slime", "assets/npcs/enemies/Slime.png", {
+      frameWidth: 98,
+      frameHeight: 79,
+    })
+
+    this.load.spritesheet("goblin", "assets/npcs/enemies/Goblin.png", {
+      frameWidth: 115,
+      frameHeight: 135,
+    })
 
     if (this.currentMap === "boss") {
       this.load.image("boss-background", "assets/mansion/sala_boss.png")
@@ -90,7 +111,7 @@ export class GameScene extends Scene {
 
     this.createMap()
 
-    keyboard.once("keydown-M", () => {
+    keyboard.on("keydown-M", () => {
       this.scene.pause("GameScene")
       this.scene.launch("PartyMenu")
     })
@@ -147,10 +168,6 @@ export class GameScene extends Scene {
     this.playerLayer.add(this.player.sprite)
 
     this.physics.add.collider(this.player.sprite, this.collisionLayer)
-    this.physics.add.collider(this.rian.sprite, this.collisionLayer)
-    this.physics.add.collider(this.lira.sprite, this.collisionLayer)
-
-    this.physics.add.collider(this.rian.sprite, this.lira.sprite)
 
     this.cameras.main.setBounds(0, 0, map.widthInPixels, map.heightInPixels)
 
@@ -184,10 +201,6 @@ export class GameScene extends Scene {
     }
 
     this.partyCharacter = activeCharacter
-    this.companions.forEach((companion) => {
-      companion.sprite.destroy()
-    })
-    this.companions = []
 
     const party: Array<"kael" | "rian" | "lira"> = ["kael", "rian", "lira"]
 

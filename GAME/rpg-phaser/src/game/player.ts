@@ -18,7 +18,7 @@ export class Player {
     this.sprite = scene.physics.add.sprite(x, y, character)
 
     this.sprite.setOrigin(0.5, 0.5)
-    this.sprite.setScale(0.28)
+    this.sprite.setScale(1.5)
 
     this.sprite.setCollideWorldBounds(true)
 
@@ -35,30 +35,8 @@ export class Player {
   }
 
   private setCenteredFrame(frame: number): void {
-    const visualCenters: Record<number, { x: number; y: number }> = {
-      0: { x: 283.7, y: 137.8 },
-      1: { x: 173.9, y: 139.2 },
-      2: { x: 51.0, y: 141.4 },
-      3: { x: 282.8, y: 123.8 },
-      4: { x: 172.1, y: 129.8 },
-      5: { x: 53.7, y: 133.6 },
-      6: { x: 281.3, y: 123.2 },
-      7: { x: 167.8, y: 121.6 },
-      8: { x: 54.1, y: 115.0 },
-      9: { x: 283.2, y: 104.2 },
-      10: { x: 175.2, y: 103.8 },
-      11: { x: 53.3, y: 100.2 },
-    }
-
-    const center = visualCenters[frame]
-
-    if (!center) {
-      this.sprite.setFrame(frame)
-      return
-    }
-
     this.sprite.setFrame(frame)
-    this.sprite.setOrigin(center.x / 341, center.y / 256)
+    this.sprite.setOrigin(0.5, 0.5)
   }
 
   update(): void {
@@ -68,10 +46,10 @@ export class Player {
       this.sprite.setVelocity(0, 0)
 
       const idleFrames = {
-        down: 0,
-        right: 6,
-        left: 3,
-        up: 9,
+        down: 26,
+        right: 39,
+        left: 13,
+        up: 0,
       }
 
       this.setCenteredFrame(idleFrames[this.facing])
@@ -94,14 +72,14 @@ export class Player {
     }
 
     const walkingFrames = {
-      down: [0, 1, 2],
-      right: [6, 7, 8],
-      left: [3, 4, 5],
-      up: [9, 10, 11],
+      down: [26, 27, 28, 29, 30, 31, 32, 33, 34],
+      right: [39, 40, 41, 42, 43, 44, 45, 46, 47],
+      left: [13, 14, 15, 16, 17, 18, 19, 20, 21],
+      up: [0, 1, 2, 3, 4, 5, 6, 7, 8],
     }
 
     const frameIndex =
-      Math.floor(this.sprite.scene.time.now / 150) % 3
+      Math.floor(this.sprite.scene.time.now / 150) % 9
 
     this.setCenteredFrame(walkingFrames[this.facing][frameIndex])
   }
@@ -113,6 +91,7 @@ export class Player {
   setCharacter(character: PlayerCharacter): void {
     this.character = character
     this.sprite.setTexture(character)
+    this.sprite.setScale(1.5)
     this.setCenteredFrame(0)
   }
 }

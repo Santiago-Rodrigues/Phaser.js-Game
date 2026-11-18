@@ -47,19 +47,19 @@ export class GameScene extends Scene {
 
   preload(): void {
     this.load.image("mansion-collider", "assets/mansion/bloco_colisao.png")
-    this.load.spritesheet("kael", "assets/protagonists/Kael.png", {
-      frameWidth: 341,
-      frameHeight: 256,
+    this.load.spritesheet("kael", "assets/protagonists/Kael/walk.png", {
+      frameWidth: 64,
+      frameHeight: 64,
     })
 
-    this.load.spritesheet("rian", "assets/protagonists/Rian.png", {
-      frameWidth: 341,
-      frameHeight: 256,
+    this.load.spritesheet("rian", "assets/protagonists/Rian/walk.png", {
+      frameWidth: 64,
+      frameHeight: 64,
     })
 
-    this.load.spritesheet("lira", "assets/protagonists/Lira.png", {
-      frameWidth: 341,
-      frameHeight: 256,
+    this.load.spritesheet("lira", "assets/protagonists/Lira/walk.png", {
+      frameWidth: 64,
+      frameHeight: 64,
     })
     this.load.spritesheet("slime", "assets/npcs/enemies/Slime.png", {
       frameWidth: 98,

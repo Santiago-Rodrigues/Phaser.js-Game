@@ -6,6 +6,7 @@ export class Companion {
   private readonly textureKey: "kael" | "rian" | "lira"
   private readonly side: -1 | 1
   private readonly formationDistance = 75
+  private facing: "up" | "down" | "left" | "right" = "down"
 
   constructor(
     scene: Phaser.Scene,
@@ -18,7 +19,7 @@ export class Companion {
     this.side = side
     this.sprite = scene.physics.add.sprite(x, y, this.textureKey)
     this.sprite.setOrigin(0.5, 0.5)
-    this.sprite.setScale(0.28)
+    this.sprite.setScale(1.5)
     this.sprite.setCollideWorldBounds(true)
 
     this.setCenteredFrame(0)
@@ -26,27 +27,8 @@ export class Companion {
   }
 
   private setCenteredFrame(frame: number): void {
-    const visualCenters: Record<number, { x: number; y: number }> = {
-      0: { x: 283.7, y: 137.8 },
-      1: { x: 173.9, y: 139.2 },
-      2: { x: 51.0, y: 141.4 },
-      3: { x: 282.8, y: 123.8 },
-      4: { x: 172.1, y: 129.8 },
-      5: { x: 53.7, y: 133.6 },
-      6: { x: 281.3, y: 123.2 },
-      7: { x: 167.8, y: 121.6 },
-      8: { x: 54.1, y: 115.0 },
-      9: { x: 283.2, y: 104.2 },
-      10: { x: 175.2, y: 103.8 },
-      11: { x: 53.3, y: 100.2 },
-    }
-
-    const center = visualCenters[frame]
     this.sprite.setFrame(frame)
-
-    if (center) {
-      this.sprite.setOrigin(center.x / 341, center.y / 256)
-    }
+    this.sprite.setOrigin(0.5, 0.5)
   }
 
   update(target: Phaser.Physics.Arcade.Sprite): void {
@@ -66,6 +48,13 @@ export class Companion {
 
     if (distance <= 20) {
       this.sprite.setVelocity(0, 0)
+      const idleFrames = {
+        down: 26,
+        right: 39,
+        left: 13,
+        up: 0,
+      }
+      this.setCenteredFrame(idleFrames[this.facing])
       return
     }
 
@@ -74,19 +63,18 @@ export class Companion {
       (distanceY / distance) * this.followSpeed,
     )
 
-    const frameIndex =
-      Math.floor(this.sprite.scene.time.now / 150) % 3
+    this.facing = Math.abs(distanceX) > Math.abs(distanceY)
+      ? distanceX > 0 ? "right" : "left"
+      : distanceY > 0 ? "down" : "up"
 
-    if (Math.abs(distanceX) > Math.abs(distanceY)) {
-      const frames = distanceX > 0
-        ? [3, 4, 5]
-        : [6, 7, 8]
-      this.setCenteredFrame(frames[frameIndex])
-    } else {
-      const frames = distanceY > 0
-        ? [0, 1, 2]
-        : [9, 10, 11]
-      this.setCenteredFrame(frames[frameIndex])
+    const walkingFrames = {
+      down: [26, 27, 28, 29, 30, 31, 32, 33, 34],
+      right: [39, 40, 41, 42, 43, 44, 45, 46, 47],
+      left: [13, 14, 15, 16, 17, 18, 19, 20, 21],
+      up: [0, 1, 2, 3, 4, 5, 6, 7, 8],
     }
+    const frameIndex =
+      Math.floor(this.sprite.scene.time.now / 150) % 9
+    this.setCenteredFrame(walkingFrames[this.facing][frameIndex])
   }
 }

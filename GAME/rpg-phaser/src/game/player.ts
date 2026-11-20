@@ -18,7 +18,7 @@ export class Player {
     this.sprite = scene.physics.add.sprite(x, y, character)
 
     this.sprite.setOrigin(0.5, 0.5)
-    this.sprite.setScale(1.5)
+    this.sprite.setScale(0.4)
 
     this.sprite.setCollideWorldBounds(true)
 

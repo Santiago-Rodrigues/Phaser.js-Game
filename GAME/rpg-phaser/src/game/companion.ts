@@ -19,7 +19,7 @@ export class Companion {
     this.side = side
     this.sprite = scene.physics.add.sprite(x, y, this.textureKey)
     this.sprite.setOrigin(0.5, 0.5)
-    this.sprite.setScale(1.5)
+    this.sprite.setScale(0.4)
     this.sprite.setCollideWorldBounds(true)
 
     this.setCenteredFrame(0)

@@ -24,6 +24,7 @@ export class GameScene extends Scene {
   private collisionLayer!:
     | Phaser.Tilemaps.TilemapLayer
     | Phaser.Tilemaps.TilemapGPULayer
+  private bossWallsSidesLayer?: Phaser.Tilemaps.TilemapLayer
   private currentMap: MansionMap = "boss"
   private transitioning = false
   private playerLayer!: Phaser.GameObjects.Container
@@ -82,10 +83,13 @@ export class GameScene extends Scene {
     })
 
     if (this.currentMap === "boss") {
-      this.load.image("boss-background", "assets/mansion/sala_boss.png")
+      this.load.image(
+        "boss-spritefusion",
+        "assets/mansion/Boss Screen/spritesheet.png",
+      )
       this.load.tilemapTiledJSON(
         "mansion-boss",
-        "assets/mansion/sala_boss.json",
+        "assets/mansion/Boss Screen/map.json",
       )
     } else if (this.currentMap === "corridor1") {
       this.load.image("corridor1-background", "assets/mansion/corredor1.png")
@@ -130,7 +134,6 @@ export class GameScene extends Scene {
 
   private createMap(): void {
     let mapKey = "mansion-boss"
-    let backgroundKey = "boss-background"
     let collisionName = "colisoes"
     let tilesetName = "colisao"
 
@@ -147,24 +150,47 @@ export class GameScene extends Scene {
     }
 
     const map = this.make.tilemap({ key: mapKey })
-    const tileset = map.addTilesetImage(tilesetName, "mansion-collider")
+    const tileset = this.currentMap === "boss"
+      ? map.addTilesetImage("spritefusion", "boss-spritefusion")
+      : map.addTilesetImage(tilesetName, "mansion-collider")
 
     if (!tileset) {
       throw new Error(`Não foi possível carregar o tileset ${tilesetName}.`)
     }
 
-    const background = this.add.image(0, 0, backgroundKey).setOrigin(0)
-    background.setDisplaySize(map.widthInPixels, map.heightInPixels)
-    background.setDepth(-10)
+    if (this.currentMap === "boss") {
+      const floor = map.createLayer("Floor", tileset, 0, 0)
+      const walls = map.createLayer("Walls", tileset, 0, 0)
+      const wallsSides = map.createLayer("Walls sides", tileset, 0, 0)
+      map.createLayer("Gargoyles", tileset, 0, 0)
+      map.createLayer("Walls pillars", tileset, 0, 0)
+      map.createLayer("Miscs", tileset, 0, 0)
+      map.createLayer("Doors", tileset, 0, 0)
 
-    this.collisionLayer = map.createLayer(collisionName, tileset, 0, 0)
+      if (!floor) {
+        throw new Error("Não foi possível criar o piso da sala do chefe.")
+      }
 
-    if (!this.collisionLayer) {
-      throw new Error(`Não foi possível criar a camada ${collisionName}.`)
+      if (!walls) {
+        throw new Error("Não foi possível criar a colisão da sala do chefe.")
+      }
+      this.collisionLayer = walls
+      this.collisionLayer.setCollisionByExclusion([-1, 0])
+
+      if (wallsSides) {
+        this.bossWallsSidesLayer = wallsSides
+        this.bossWallsSidesLayer.setCollisionByExclusion([-1, 0])
+      }
+    } else {
+      this.collisionLayer = map.createLayer(collisionName, tileset, 0, 0)
+
+      if (!this.collisionLayer) {
+        throw new Error(`Não foi possível criar a camada ${collisionName}.`)
+      }
+
+      this.collisionLayer.setCollision([1])
+      this.collisionLayer.setVisible(false)
     }
-
-    this.collisionLayer.setCollision([1])
-    this.collisionLayer.setVisible(false)
 
     const spawn = this.getSpawnPosition()
 
@@ -176,14 +202,30 @@ export class GameScene extends Scene {
 
     this.syncParty(spawn.x, spawn.y)
 
-    this.playerLayer.add(this.player.sprite)
+    if (this.currentMap !== "boss") {
+      this.playerLayer.add(this.player.sprite)
+    }
+    this.player.sprite.setDepth(100)
+    this.player.sprite.setVisible(true)
+    this.player.sprite.setActive(true)
 
     this.physics.add.collider(this.player.sprite, this.collisionLayer)
+    if (this.currentMap === "boss" && this.bossWallsSidesLayer) {
+      this.physics.add.collider(
+        this.player.sprite,
+        this.bossWallsSidesLayer,
+      )
+    }
 
     this.cameras.main.setBounds(0, 0, map.widthInPixels, map.heightInPixels)
 
     if (this.currentMap === "boss") {
       this.cameras.main.stopFollow()
+      this.cameras.main.setZoom(2.5)
+      this.cameras.main.centerOn(
+        map.widthInPixels / 2,
+        map.heightInPixels / 2,
+      )
     } else {
       this.cameras.main.startFollow(this.player.sprite, true, 0.12, 0.12)
       this.cameras.main.setRoundPixels(true)
@@ -193,9 +235,18 @@ export class GameScene extends Scene {
     this.player.sprite.setCollideWorldBounds(true)
 
     if (this.currentMap === "boss") {
-      this.slime = new Slime(this, 400, 320)
-      this.playerLayer.add(this.slime.sprite)
+      this.slime = new Slime(this, 160, 84)
+      this.slime.sprite.setDepth(100)
+      if (this.currentMap !== "boss") {
+        this.playerLayer.add(this.slime.sprite)
+      }
       this.physics.add.collider(this.slime.sprite, this.collisionLayer)
+      if (this.bossWallsSidesLayer) {
+        this.physics.add.collider(
+          this.slime.sprite,
+          this.bossWallsSidesLayer,
+        )
+      }
       this.physics.add.collider(this.player.sprite, this.slime.sprite)
     }
 
@@ -236,7 +287,10 @@ export class GameScene extends Scene {
       )
 
       this.companions.push(companion)
-      this.playerLayer.add(companion.sprite)
+      companion.sprite.setDepth(100)
+      if (this.currentMap !== "boss") {
+        this.playerLayer.add(companion.sprite)
+      }
       this.physics.add.collider(companion.sprite, this.collisionLayer)
     })
 
@@ -252,7 +306,7 @@ export class GameScene extends Scene {
     const spawn = this.registry.get("mansionSpawn") as MansionSpawn | undefined
 
     if (this.currentMap === "boss") {
-      return spawn === "bossBottom" ? { x: 400, y: 530 } : { x: 400, y: 520 }
+      return { x: 160, y: 168 }
     }
 
     if (this.currentMap === "corridor1") {
@@ -274,7 +328,7 @@ export class GameScene extends Scene {
 
   private createTransitionZones(): void {
     if (this.currentMap === "boss") {
-      this.createZone(400, 580, 220, 40, "bossToCorridor1")
+      this.createZone(160, 175, 64, 32, "bossToCorridor1")
     }
 
     if (this.currentMap === "corridor1") {
@@ -301,10 +355,10 @@ export class GameScene extends Scene {
     const label = this.add
       .text(x, y - height / 2 - 24, "E  Interagir", {
         fontFamily: "Arial",
-        fontSize: "18px",
+        fontSize: "9px",
         color: "#ffffff",
         backgroundColor: "#20263a",
-        padding: { x: 10, y: 6 },
+        padding: { x: 5, y: 3 },
       })
       .setOrigin(0.5)
       .setDepth(100)

@@ -2,7 +2,7 @@ export class Slime {
   readonly sprite: Phaser.Physics.Arcade.Sprite
 
   private health = 3
-  private readonly maxSpeed = 70
+  private readonly maxSpeed = 30
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     this.sprite = scene.physics.add.sprite(x, y, "slime")
@@ -10,7 +10,7 @@ export class Slime {
     this.sprite.setCollideWorldBounds(true)
 
     this.sprite.setOrigin(0.5, 0.5)
-    this.sprite.setScale(0.30)
+    this.sprite.setScale(0.1)
     this.sprite.setVelocity(0, 0)
   }
 

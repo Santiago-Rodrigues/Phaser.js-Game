@@ -12,7 +12,6 @@ type GameMap =
   | "forest1"
   | "forest2"
   | "forest3"
-  | "forest4"
   | "mansionEntrance"
 type MansionSpawn =
   | "bossBottom"
@@ -24,9 +23,8 @@ type MansionSpawn =
   | "forest2FromForest1"
   | "forest2FromForest3"
   | "forest3FromForest2"
-  | "forest3FromForest4"
-  | "forest4FromForest3"
-  | "mansionEntranceFromForest4"
+  | "forest3FromMansionEntrance"
+  | "mansionEntranceFromForest3"
 
 export class GameScene extends Scene {
   private player!: Player
@@ -77,12 +75,10 @@ export class GameScene extends Scene {
     this.load.image("forest1-background", "assets/forest/floresta1.png")
     this.load.image("forest2-background", "assets/forest/floresta2.png")
     this.load.image("forest3-background", "assets/forest/floresta3.png")
-    this.load.image("forest4-background", "assets/forest/floresta4.png")
     this.load.image("mansion-entrance-background", "assets/forest/entrada_mansao.png")
     this.load.tilemapTiledJSON("forest1", "assets/forest/forest1.json")
     this.load.tilemapTiledJSON("forest2", "assets/forest/forest2.json")
     this.load.tilemapTiledJSON("forest3", "assets/forest/forest3.json")
-    this.load.tilemapTiledJSON("forest4", "assets/forest/forest4.json")
     this.load.tilemapTiledJSON("mansion-entrance", "assets/forest/entrada_mansion.json")
     this.load.spritesheet("kael", "assets/protagonists/Kael/walk.png", {
       frameWidth: 64,
@@ -112,7 +108,6 @@ export class GameScene extends Scene {
       this.currentMap === "forest1" ||
       this.currentMap === "forest2" ||
       this.currentMap === "forest3" ||
-      this.currentMap === "forest4" ||
       this.currentMap === "mansionEntrance"
     ) {
       // Forest and mansion entrance maps were loaded above.
@@ -187,11 +182,6 @@ export class GameScene extends Scene {
       backgroundKey = "forest3-background"
       collisionName = "Camada de Blocos 2"
       tilesetName = "collider"
-    } else if (this.currentMap === "forest4") {
-      mapKey = "forest4"
-      backgroundKey = "forest4-background"
-      collisionName = "Camada de Blocos 2"
-      tilesetName = "collider"
     } else if (this.currentMap === "mansionEntrance") {
       mapKey = "mansion-entrance"
       backgroundKey = "mansion-entrance-background"
@@ -220,7 +210,6 @@ export class GameScene extends Scene {
       this.currentMap === "forest1" ||
       this.currentMap === "forest2" ||
       this.currentMap === "forest3" ||
-      this.currentMap === "forest4" ||
       this.currentMap === "mansionEntrance"
 
     if (isForestMap) {
@@ -278,11 +267,6 @@ export class GameScene extends Scene {
       this.spawnForestSlimes([
         [290, 515, 176, 67],
         [529, 381, 171, 85],
-      ])
-    } else if (this.currentMap === "forest4") {
-      this.spawnForestSlimes([
-        [219, 490, 39, 13],
-        [543, 532, 186, 83],
       ])
     } else if (this.currentMap === "mansionEntrance") {
       this.spawnForestSlimes([
@@ -397,14 +381,10 @@ export class GameScene extends Scene {
     }
 
     if (this.currentMap === "forest3") {
-      if (spawn === "forest3FromForest4") {
+      if (spawn === "forest3FromMansionEntrance") {
         return forestCenter(629, 542, 176, 88)
       }
       return forestCenter(231, 113, 110, 64)
-    }
-
-    if (this.currentMap === "forest4") {
-      return forestCenter(533, 165, 164, 99)
     }
 
     if (this.currentMap === "mansionEntrance") {
@@ -438,22 +418,17 @@ export class GameScene extends Scene {
     }
 
     if (this.currentMap === "forest2") {
-      this.createZone(353, 125, 150, 62, "forest2ToForest1")
+      this.createZone(269,99,130,85, "forest2ToForest1")
       this.createZone(200, 673, 181, 101, "forest2ToForest3")
     }
 
     if (this.currentMap === "forest3") {
       this.createZone(231, 113, 110, 64, "forest3ToForest2")
-      this.createZone(629, 542, 176, 88, "forest3ToForest4")
-    }
-
-    if (this.currentMap === "forest4") {
-      this.createZone(629, 542, 176, 88, "forest4ToForest3")
-      this.createZone(508, 638, 166, 99, "forest4ToMansionEntrance")
+      this.createZone(629, 542, 176, 88, "forest3ToMansionEntrance")
     }
 
     if (this.currentMap === "mansionEntrance") {
-      this.createZone(396, 37, 95, 71, "mansionEntranceToForest4")
+      this.createZone(396, 37, 95, 71, "mansionEntranceToForest3")
       this.createZone(636, 215, 55, 63, "mansionEntranceToMansion")
       this.createZone(434, 653, 137, 99, "mansionParty")
     }
@@ -484,7 +459,6 @@ export class GameScene extends Scene {
       this.currentMap === "forest1" ||
       this.currentMap === "forest2" ||
       this.currentMap === "forest3" ||
-      this.currentMap === "forest4" ||
       this.currentMap === "mansionEntrance"
     const scale = isSourcePixelZone ? 1600 / 768 : 1
     const zoneX = isSourcePixelZone ? (x + width / 2) * scale : x
@@ -586,34 +560,18 @@ export class GameScene extends Scene {
       return
     }
 
-    if (target === "forest3ToForest4") {
-      this.scene.restart({
-        map: "forest4",
-        spawn: "forest4FromForest3",
-      })
-      return
-    }
-
-    if (target === "forest4ToForest3") {
-      this.scene.restart({
-        map: "forest3",
-        spawn: "forest3FromForest4",
-      })
-      return
-    }
-
-    if (target === "forest4ToMansionEntrance") {
+    if (target === "forest3ToMansionEntrance") {
       this.scene.restart({
         map: "mansionEntrance",
-        spawn: "mansionEntranceFromForest4",
+        spawn: "mansionEntranceFromForest3",
       })
       return
     }
 
-    if (target === "mansionEntranceToForest4") {
+    if (target === "mansionEntranceToForest3") {
       this.scene.restart({
-        map: "forest4",
-        spawn: "mansionEntranceFromForest4",
+        map: "forest3",
+        spawn: "forest3FromMansionEntrance",
       })
       return
     }
@@ -649,7 +607,7 @@ export class GameScene extends Scene {
     if (target === "corridor2ToMansionEntrance") {
       this.scene.restart({
         map: "mansionEntrance",
-        spawn: "mansionEntranceFromForest4",
+        spawn: "mansionEntranceFromForest3",
       })
     }
   }

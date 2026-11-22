@@ -385,7 +385,7 @@ export class GameScene extends Scene {
 
     if (this.currentMap === "forest1") {
       return spawn === "forest1FromForest2"
-        ? forestCenter(386, 700, 96, 77)
+        ? forestCenter(382, 700, 50, 30)
         : forestCenter(165, 232, 168, 61)
     }
 
@@ -393,18 +393,18 @@ export class GameScene extends Scene {
       if (spawn === "forest2FromForest3") {
         return forestCenter(223, 118, 170, 81)
       }
-      return forestCenter(386, 700, 96, 77)
+      return forestCenter(353, 125, 150, 62)
     }
 
     if (this.currentMap === "forest3") {
       if (spawn === "forest3FromForest4") {
-        return forestCenter(655, 550, 184, 63)
+        return forestCenter(629, 542, 176, 88)
       }
-      return forestCenter(251, 683, 175, 103)
+      return forestCenter(231, 113, 110, 64)
     }
 
     if (this.currentMap === "forest4") {
-      return forestCenter(655, 550, 184, 63)
+      return forestCenter(533, 165, 164, 99)
     }
 
     if (this.currentMap === "mansionEntrance") {
@@ -434,22 +434,22 @@ export class GameScene extends Scene {
 
   private createTransitionZones(): void {
     if (this.currentMap === "forest1") {
-      this.createZone(262, 55, 154, 65, "forest1ToForest2")
+      this.createZone(382, 700, 50, 30, "forest1ToForest2")
     }
 
     if (this.currentMap === "forest2") {
-      this.createZone(262, 55, 154, 65, "forest2ToForest1")
-      this.createZone(223, 118, 170, 81, "forest2ToForest3")
+      this.createZone(353, 125, 150, 62, "forest2ToForest1")
+      this.createZone(200, 673, 181, 101, "forest2ToForest3")
     }
 
     if (this.currentMap === "forest3") {
-      this.createZone(251, 683, 175, 103, "forest3ToForest2")
-      this.createZone(655, 550, 184, 63, "forest3ToForest4")
+      this.createZone(231, 113, 110, 64, "forest3ToForest2")
+      this.createZone(629, 542, 176, 88, "forest3ToForest4")
     }
 
     if (this.currentMap === "forest4") {
-      this.createZone(655, 550, 184, 63, "forest4ToForest3")
-      this.createZone(536, 125, 198, 73, "forest4ToMansionEntrance")
+      this.createZone(629, 542, 176, 88, "forest4ToForest3")
+      this.createZone(508, 638, 166, 99, "forest4ToMansionEntrance")
     }
 
     if (this.currentMap === "mansionEntrance") {

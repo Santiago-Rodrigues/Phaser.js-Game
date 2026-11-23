@@ -11,13 +11,14 @@ export class Slime {
   private stoppedUntil = 0
   private invulnerableUntil = 0
 
-  constructor(scene: Phaser.Scene, x: number, y: number) {
-    this.sprite = scene.physics.add.sprite(x, y, "slime")
+  constructor(scene: Phaser.Scene, x: number, y: number, private readonly statue = false) {
+    this.sprite = scene.physics.add.sprite(x, y, statue ? "statue-walk" : "slime", statue ? 26 : 0)
 
     this.sprite.setCollideWorldBounds(true)
 
     this.sprite.setOrigin(0.5, 0.5)
-    this.sprite.setScale(0.60)
+    this.sprite.setScale(statue ? 1.25 : 0.60)
+    if (statue) this.sprite.setBodySize(38, 38)
     this.sprite.setVelocity(0, 0)
 
     const background = scene.add.rectangle(0, 0, 62, 11, 0x25171c)
@@ -68,6 +69,13 @@ export class Slime {
     const distanceX = player.x - this.sprite.x
     const distanceY = player.y - this.sprite.y
     const distance = Math.hypot(distanceX, distanceY)
+
+    if (this.statue) {
+      const row = Math.abs(distanceX) > Math.abs(distanceY)
+        ? (distanceX < 0 ? 1 : 3)
+        : (distanceY < 0 ? 0 : 2)
+      this.sprite.setFrame(row * 13 + Math.floor(now / 130) % 9)
+    }
 
     if (distance === 0) {
       this.sprite.setVelocity(0, 0)

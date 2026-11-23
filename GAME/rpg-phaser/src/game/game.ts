@@ -3,6 +3,9 @@ import { Bullet } from "./bullets"
 import { attackSheets, Player, type PlayerCharacter } from "./player"
 import { Slime } from "./slime"
 import { Companion } from "./companion"
+import { Gorga, gorgaSheets } from "./gorga"
+
+type Enemy = Slime | Gorga
 
 type GameMap =
   | "boss"
@@ -18,6 +21,7 @@ type MansionSpawn =
   | "corridor1Top"
   | "corridor1Bottom"
   | "corridor2Top"
+  | "corridor2FromMansion"
   | "forest1Start"
   | "forest1FromForest2"
   | "forest2FromForest1"
@@ -29,16 +33,16 @@ type MansionSpawn =
   | "mansionReception"
   | "mansionReceptionFromHall"
   | "mansionHallFromReception"
-  | "mansionHallFromBedroom"
   | "mansionLeftDoorFromBedroom"
-  | "mansionBedroom"
   | "mansionBedroomFromLeftDoor"
 
 export class GameScene extends Scene {
   private player!: Player
   private companions: Companion[] = []
   private partyCharacter: PlayerCharacter | null = null
-  private readonly slimes: Slime[] = []
+  private readonly enemies: Enemy[] = []
+  private boss?: Gorga
+  private clearBossSpell?: () => void
   private readonly bullets: Bullet[] = []
   private attackKey!: Phaser.Input.Keyboard.Key
   private interactKey!: Phaser.Input.Keyboard.Key
@@ -71,7 +75,9 @@ export class GameScene extends Scene {
     this.nextContactDamageAt = 0
     this.activeTransition = undefined
     this.bullets.length = 0
-    this.slimes.length = 0
+    this.enemies.length = 0
+    this.boss = undefined
+    this.clearBossSpell = undefined
 
     this.companions = []
     this.partyCharacter = null
@@ -131,9 +137,16 @@ export class GameScene extends Scene {
       frameHeight: 79,
     })
 
-    this.load.spritesheet("goblin", "assets/npcs/enemies/Goblin.png", {
-      frameWidth: 115,
-      frameHeight: 135,
+    for (const [key, path] of Object.entries(gorgaSheets)) {
+      this.load.spritesheet(key, `assets/npcs/elara/${path}`, {
+        frameWidth: 64,
+        frameHeight: 64,
+      })
+    }
+    this.load.image("gorga-spell", "assets/npcs/elara/Gorga/spell.png")
+    this.load.spritesheet("statue-walk", "assets/npcs/enemies/estatua/walk.png", {
+      frameWidth: 64,
+      frameHeight: 64,
     })
 
     if (
@@ -156,13 +169,13 @@ export class GameScene extends Scene {
       this.load.image("corridor1-background", "assets/mansion/catacombs/corredor1.png")
       this.load.tilemapTiledJSON(
         "mansion-corridor1",
-        "assets/mansion/corredor1.json",
+        "assets/mansion/catacombs/corredor1.json",
       )
     } else {
       this.load.image("corridor2-background", "assets/mansion/catacombs/corredor2.png")
       this.load.tilemapTiledJSON(
         "mansion-corridor2",
-        "assets/mansion/corredor2.json",
+        "assets/mansion/catacombs/corredor2.json",
       )
     }
   }
@@ -276,6 +289,13 @@ export class GameScene extends Scene {
     }
 
     this.collisionLayer.setCollision([1])
+    if (this.currentMap === "corridor1" || this.currentMap === "corridor2") {
+      this.collisionLayer.forEachTile((tile) => {
+        if (tile.collides) {
+          tile.setSize(map.tileWidth, map.tileHeight, map.tileWidth, map.tileHeight)
+        }
+      })
+    }
     this.collisionLayer.setVisible(false)
 
     const spawn = this.getSpawnPosition()
@@ -305,7 +325,23 @@ export class GameScene extends Scene {
     this.player.sprite.setCollideWorldBounds(true)
 
     if (this.currentMap === "boss") {
-      this.spawnSlimes([{ x: 400, y: 320 }])
+      this.boss = new Gorga(
+        this, 400, 260,
+        (x, y, dx, dy) => this.castBossSpell(x, y, dx, dy),
+        () => this.takeContactDamage(),
+      )
+      this.addEnemy(this.boss)
+    } else if (this.currentMap === "mansion") {
+      this.createReceptionist()
+      if (
+        this.registry.get("mansionBedroomVisited") === true &&
+        this.registry.get("mansionHallCleared") !== true &&
+        this.registry.get("mansionHallAmbushStarted") === true
+      ) {
+        this.spawnSlimes([{ x: 1424, y: 400 }, { x: 1568, y: 400 }])
+      }
+    } else if (this.currentMap === "corridor1" || this.currentMap === "corridor2") {
+      this.spawnStatues(spawn)
     } else if (this.currentMap === "forest2") {
       this.spawnForestSlimes([
         [497, 512, 158, 66],
@@ -327,14 +363,72 @@ export class GameScene extends Scene {
 
   private spawnSlimes(points: Array<{ x: number; y: number }>): void {
     points.forEach((point) => {
-      const slime = new Slime(this, point.x, point.y)
-      this.slimes.push(slime)
-      this.playerLayer.add(slime.sprite)
-      this.physics.add.collider(slime.sprite, this.collisionLayer)
-      this.physics.add.collider(this.player.sprite, slime.sprite, () => {
-        this.takeContactDamage(slime)
-      })
+      this.addEnemy(new Slime(this, point.x, point.y))
     })
+  }
+
+  private addEnemy(enemy: Enemy): void {
+    this.enemies.push(enemy)
+    this.playerLayer.add(enemy.sprite)
+    this.physics.add.collider(enemy.sprite, this.collisionLayer)
+    this.physics.add.collider(this.player.sprite, enemy.sprite, () => {
+      if (enemy instanceof Slime) this.takeContactDamage(enemy)
+    })
+  }
+
+  private createReceptionist(): void {
+    const receptionist = this.add.sprite(1696, 805, "elara-idle", 26).setScale(1.5)
+    this.playerLayer.add(receptionist)
+    this.time.addEvent({
+      delay: 250,
+      loop: true,
+      callback: () => receptionist.setFrame(String(receptionist.frame.name) === "26" ? 27 : 26),
+    })
+  }
+
+  private spawnStatues(spawn: { x: number; y: number }): void {
+    // Candidate positions follow the walkable paths, including the lower bend of corridor 2.
+    const candidates = this.currentMap === "corridor1"
+      ? [[720, 360], [720, 520], [720, 680], [720, 840], [752, 1040], [736, 1220], [736, 1380]]
+      : [[416, 520], [400, 620], [384, 740], [416, 930], [432, 1190], [608, 1352], [784, 1352]]
+    const points = candidates.filter(([x, y]) =>
+      Math.hypot(x - spawn.x, y - spawn.y) >= 145 &&
+      this.collisionLayer.getTilesWithinWorldXY(x - 24, y - 24, 48, 48, { isColliding: true }).length === 0,
+    )
+    for (let count = 0; count < 3 && points.length > 0; count++) {
+      const [point] = points.splice(Math.floor(Math.random() * points.length), 1)
+      const [x, y] = point
+      this.addEnemy(new Slime(this, x, y, true))
+    }
+  }
+
+  private castBossSpell(x: number, y: number, dx: number, dy: number): void {
+    const length = Math.hypot(dx, dy)
+    if (length === 0) return
+
+    const spell = this.physics.add.sprite(x, y, "gorga-spell")
+      .setDisplaySize(80, 80)
+      .setOrigin(0.78, 0.66)
+      .setRotation(Math.atan2(dy, dx) - 0.47)
+      .setVelocity(dx / length * 235, dy / length * 235)
+    const size = 24 / spell.scaleX
+    spell.setBodySize(size, size, false)
+      .setOffset(spell.displayOriginX - size / 2, spell.displayOriginY - size / 2)
+      .setDepth(11)
+    const expire = () => {
+      this.clearBossSpell = undefined
+      timeout.remove()
+      wall.destroy()
+      hit.destroy()
+      spell.destroy()
+    }
+    const wall = this.physics.add.collider(spell, this.collisionLayer, expire)
+    const hit = this.physics.add.overlap(spell, this.player.sprite, () => {
+      expire()
+      this.takeContactDamage()
+    })
+    const timeout = this.time.delayedCall(1800, expire)
+    this.clearBossSpell = expire
   }
 
   private updatePlayerHealthHud(): void {
@@ -343,8 +437,8 @@ export class GameScene extends Scene {
     })
   }
 
-  private takeContactDamage(slime: Slime): void {
-    if (this.transitioning || this.time.now < this.nextContactDamageAt) {
+  private takeContactDamage(slime?: Slime): void {
+    if (this.transitioning || this.boss?.locksParty || this.time.now < this.nextContactDamageAt) {
       return
     }
 
@@ -352,7 +446,7 @@ export class GameScene extends Scene {
     this.updatePlayerHealthHud()
     this.nextContactDamageAt = this.time.now + 1000
     this.player.playHurt(this.nextContactDamageAt)
-    slime.stopUntil(this.nextContactDamageAt)
+    slime?.stopUntil(this.nextContactDamageAt)
 
     if (this.playerHealth === 0) {
       this.transitioning = true
@@ -467,11 +561,8 @@ export class GameScene extends Scene {
           return { x: 2064, y: 880 }
         case "mansionHallFromReception":
           return { x: 1824, y: 400 }
-        case "mansionHallFromBedroom":
-          return { x: 1240, y: 400 }
         case "mansionLeftDoorFromBedroom":
           return { x: 368, y: 1120 }
-        case "mansionBedroom":
         case "mansionBedroomFromLeftDoor":
           return { x: 480, y: 580 }
         default:
@@ -489,12 +580,16 @@ export class GameScene extends Scene {
       }
 
       if (spawn === "corridor1Bottom") {
-        return { x: 720, y: 1440 }
+        return { x: 720, y: 1400 }
       }
     }
 
     if (spawn === "corridor2Top") {
-      return { x: 400, y: 300 }
+      return { x: 416, y: 344 }
+    }
+
+    if (spawn === "corridor2FromMansion") {
+      return { x: 864, y: 1352 }
     }
 
     return { x: 800, y: 1500 }
@@ -525,7 +620,7 @@ export class GameScene extends Scene {
       this.createZone(1616, 1000, 128, 64, "mansionReceptionDesk", "E  Falar na recepção")
       this.createZone(2000, 784, 128, 56, "mansionReceptionToHall", "E  Ir ao corredor")
       this.createZone(1680, 376, 128, 52, "mansionHallToReception", "E  Voltar à recepção")
-      this.createZone(1080, 376, 128, 52, "mansionHallToBedroom", "E  Entrar no quarto")
+      this.createZone(1080, 376, 128, 52, "mansionToCatacombs", "E  Entrar nas catacumbas")
       this.createZone(320, 1024, 112, 64, "mansionLeftDoorToBedroom", "E  Entrar no quarto")
       this.createZone(424, 608, 112, 52, "mansionBedroomToHall", "E  Voltar ao corredor")
     }
@@ -535,13 +630,14 @@ export class GameScene extends Scene {
     }
 
     if (this.currentMap === "corridor1") {
-      this.createZone(720, 150, 128, 80, "corridor1ToBoss")
+      this.createZone(623, 128, 192, 80, "corridor1ToBoss", "E  Entrar na sala do chefe")
 
-      this.createZone(720, 1540, 135, 120, "corridor1ToCorridor2")
+      this.createZone(624, 1450, 224, 102, "corridor1ToCorridor2", "E  Ir ao Corredor 2")
     }
 
     if (this.currentMap === "corridor2") {
-      this.createZone(400, 250, 300, 80, "corridor2ToMansionEntrance")
+      this.createZone(368, 288, 96, 32, "corridor2ToCorridor1", "E  Voltar ao primeiro corredor")
+      this.createZone(904, 1328, 120, 64, "corridor2ToMansionEntrance", "E  Sair das catacumbas")
     }
   }
 
@@ -592,6 +688,8 @@ export class GameScene extends Scene {
     let closestPrompt: Phaser.GameObjects.Text | undefined
     let closestDistance = Number.POSITIVE_INFINITY
     const spokeToReception = this.registry.get("mansionReceptionSpoken") === true
+    const catacombsUnlocked = this.registry.get("mansionHallCleared") === true
+    const mansionUnlocked = this.registry.get("partyJoined") === true
 
     this.transitionZones.forEach(({ zone, label, target }) => {
       const bounds = zone.getBounds()
@@ -602,12 +700,23 @@ export class GameScene extends Scene {
       )
 
       const portalLocked = target === "mansionReceptionToHall" && !spokeToReception
+      const catacombsLocked = target === "mansionToCatacombs" && !catacombsUnlocked
+      const mansionLocked = target === "mansionEntranceToMansion" && !mansionUnlocked
+      if (target === "mansionEntranceToMansion") {
+        label.setText(mansionLocked ? "Derrote os dois slimes primeiro" : "E  Entrar na mansão")
+      }
       if (target === "mansionReceptionToHall") {
         label.setText(portalLocked ? "Fale na recepção primeiro" : "E  Ir ao corredor")
       }
+      if (target === "mansionToCatacombs") {
+        const lockedMessage = this.registry.get("mansionHallAmbushStarted") === true
+          ? "Derrote os dois inimigos no corredor"
+          : "A porta está trancada"
+        label.setText(catacombsLocked ? lockedMessage : "E  Entrar nas catacumbas")
+      }
       label.setVisible(isInside)
 
-      if (isInside && !portalLocked) {
+      if (isInside && !portalLocked && !catacombsLocked && !mansionLocked) {
         const distanceX = this.player.sprite.x - zone.x
         const distanceY = this.player.sprite.y - zone.y
         const distance = Math.hypot(distanceX, distanceY)
@@ -632,6 +741,15 @@ export class GameScene extends Scene {
 
     if (target === "mansionReceptionDesk") {
       this.registry.set("mansionReceptionSpoken", true)
+      const dialogue = this.add.text(
+        1680, 985,
+        "Elora: Pode seguir pelo arco. A porta das catacumbas está trancada.",
+        {
+          fontSize: "17px", color: "#ffffff", backgroundColor: "#20263a",
+          padding: { x: 10, y: 6 }, wordWrap: { width: 330 },
+        },
+      ).setOrigin(0.5, 1).setDepth(100)
+      this.time.delayedCall(4200, () => dialogue.destroy())
       return
     }
 
@@ -639,7 +757,11 @@ export class GameScene extends Scene {
 
     switch (target) {
       case "mansionEntranceToMansion":
-        this.scene.restart({ map: "mansion", spawn: "mansionReception" })
+        if (this.registry.get("partyJoined") === true) {
+          this.scene.restart({ map: "mansion", spawn: "mansionReception" })
+        } else {
+          this.transitioning = false
+        }
         return
       case "mansionToOutside":
         this.scene.restart({ map: "mansionEntrance", spawn: "mansionEntranceFromInterior" })
@@ -654,19 +776,22 @@ export class GameScene extends Scene {
       case "mansionHallToReception":
         this.scene.restart({ map: "mansion", spawn: "mansionReceptionFromHall" })
         return
-      case "mansionHallToBedroom":
-        this.scene.restart({ map: "mansion", spawn: "mansionBedroom" })
+      case "mansionToCatacombs":
+        if (this.registry.get("mansionHallCleared") === true) {
+          this.scene.restart({ map: "corridor2", spawn: "corridor2FromMansion" })
+        } else {
+          this.transitioning = false
+        }
         return
       case "mansionLeftDoorToBedroom":
+        this.registry.set("mansionBedroomVisited", true)
         this.scene.restart({ map: "mansion", spawn: "mansionBedroomFromLeftDoor" })
         return
       case "mansionBedroomToHall":
-        this.scene.restart({
-          map: "mansion",
-          spawn: this.registry.get("mansionSpawn") === "mansionBedroomFromLeftDoor"
-            ? "mansionLeftDoorFromBedroom"
-            : "mansionHallFromBedroom",
-        })
+        if (this.registry.get("mansionBedroomVisited") === true) {
+          this.registry.set("mansionHallAmbushStarted", true)
+        }
+        this.scene.restart({ map: "mansion", spawn: "mansionLeftDoorFromBedroom" })
         return
     }
 
@@ -747,7 +872,7 @@ export class GameScene extends Scene {
     if (target === "corridor2ToMansionEntrance") {
       this.scene.restart({
         map: "mansionEntrance",
-        spawn: "mansionEntranceFromForest3",
+        spawn: "mansionEntranceFromInterior",
       })
       return
     }
@@ -755,7 +880,7 @@ export class GameScene extends Scene {
     this.transitioning = false
   }
 
-  private swingSword(hit: Set<Slime>): void {
+  private swingSword(hit: Set<Enemy>): void {
     // Bounds of the forward sword arc in the 128 px half-slash frames.
     const swordBounds = {
       up: [64, 39, 103, 63],
@@ -768,7 +893,7 @@ export class GameScene extends Scene {
     const frameLeft = sprite.x - sprite.displayOriginX * sprite.scaleX
     const frameTop = sprite.y - sprite.displayOriginY * sprite.scaleY
 
-    for (const slime of this.slimes) {
+    for (const slime of this.enemies) {
       const body = slime.sprite.body
       if (
         slime.sprite.active &&
@@ -808,7 +933,7 @@ export class GameScene extends Scene {
       bullet.sprite.disableBody(true, true)
     })
 
-    this.slimes.forEach((slime) => {
+    this.enemies.forEach((slime) => {
       if (slime.sprite.active) {
         this.physics.add.overlap(bullet.sprite, slime.sprite, () => {
           if (!bullet.sprite.active) {
@@ -832,6 +957,15 @@ export class GameScene extends Scene {
       return
     }
 
+    if (this.boss?.locksParty) {
+      this.clearBossSpell?.()
+      this.player.cancelAttack()
+      this.player.sprite.setVelocity(0, 0)
+      this.companions.forEach((companion) => companion.sprite.setVelocity(0, 0))
+      this.boss.update(this.player.sprite)
+      return
+    }
+
     const activeCharacter = this.registry.get(
       "activeCharacter",
     ) as PlayerCharacter
@@ -852,17 +986,27 @@ export class GameScene extends Scene {
       companion.update(this.player.sprite)
     })
 
-    this.slimes.forEach((slime) => {
+    this.enemies.forEach((slime) => {
       if (slime.sprite.active) {
         slime.update(this.player.sprite)
       }
     })
 
     if (
+      this.currentMap === "mansion" &&
+      this.registry.get("mansionHallAmbushStarted") === true &&
+      this.enemies.length === 2 &&
+      this.enemies.every((enemy) => !enemy.sprite.active)
+    ) {
+      this.registry.set("mansionHallCleared", true)
+      this.enemies.length = 0
+    }
+
+    if (
       this.currentMap === "mansionEntrance" &&
       this.registry.get("partyJoined") !== true &&
-      this.slimes.length === 2 &&
-      this.slimes.every((slime) => !slime.sprite.active)
+      this.enemies.length === 2 &&
+      this.enemies.every((slime) => !slime.sprite.active)
     ) {
       this.registry.set("partyJoined", true)
       this.syncParty(
@@ -874,7 +1018,7 @@ export class GameScene extends Scene {
     const attackPressed = Input.Keyboard.JustDown(this.attackKey)
     if (activeCharacter === "rian") {
       if (attackPressed) {
-        const hit = new Set<Slime>()
+        const hit = new Set<Enemy>()
         this.player.startAttack(() => this.swingSword(hit))
       }
     } else if (this.attackKey.isDown) {

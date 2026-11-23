@@ -93,6 +93,13 @@ export class Player {
     this.sprite.setOffset((size - 64) / 2, (size - 64) / 2)
   }
 
+  cancelAttack(): void {
+    if (!this.attack) return
+    this.attack = undefined
+    this.sprite.setTexture(this.character)
+    this.sprite.setOffset(0, 0)
+  }
+
   private updateAttack(): boolean {
     if (!this.attack) {
       return false

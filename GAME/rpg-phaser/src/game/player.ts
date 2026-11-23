@@ -2,11 +2,14 @@ import { Controls } from "./controls"
 
 export type PlayerCharacter = "kael" | "rian" | "lira"
 export class Player {
+  static readonly hurtDuration = 325
   readonly sprite: Phaser.Physics.Arcade.Sprite
   character: PlayerCharacter
 
   private readonly controls: Controls
   private readonly speed = 800
+  private hurtStartedAt = 0
+  private invulnerableUntil = 0
   private facing: "up" | "down" | "left" | "right" = "down"
 
   constructor(
@@ -39,7 +42,40 @@ export class Player {
     this.sprite.setOrigin(0.5, 0.5)
   }
 
+  playHurt(invulnerableUntil: number): void {
+    this.hurtStartedAt = this.sprite.scene.time.now
+    this.invulnerableUntil = invulnerableUntil
+    this.sprite.setVelocity(0, 0)
+    this.updateHurt()
+  }
+
+  private updateHurt(): boolean {
+    const now = this.sprite.scene.time.now
+    const elapsed = now - this.hurtStartedAt
+
+    if (now < this.invulnerableUntil) {
+      this.sprite.setAlpha(Math.floor(elapsed / 100) % 2 === 0 ? 0.35 : 1)
+
+      if (elapsed < Player.hurtDuration) {
+        this.sprite.setTexture(`${this.character}-hurt`, Math.floor(elapsed / 25))
+        return true
+      }
+    } else if (this.invulnerableUntil !== 0) {
+      this.sprite.setAlpha(1)
+      this.invulnerableUntil = 0
+    }
+
+    if (this.sprite.texture.key !== this.character) {
+      this.sprite.setTexture(this.character)
+    }
+    return false
+  }
+
   update(): void {
+    if (this.updateHurt()) {
+      return
+    }
+
     const movement = this.controls.getMovement()
 
     if (movement.horizontal === 0 && movement.vertical === 0) {

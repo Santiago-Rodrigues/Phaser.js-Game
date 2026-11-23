@@ -8,6 +8,7 @@ export class Bullet {
         x: number,
         y: number,
         direction: FacingDirection,
+        color: number,
         speed = 360
     ) {
         this.createPlaceholderTexture(scene);
@@ -19,6 +20,7 @@ export class Bullet {
         );
 
         this.sprite.setCollideWorldBounds(true);
+        this.sprite.setTint(color);
 
         const velocities: Record<
             FacingDirection,
@@ -52,7 +54,7 @@ export class Bullet {
 
         const graphics = scene.add.graphics();
 
-        graphics.fillStyle(0xfacc15);
+        graphics.fillStyle(0xffffff);
         graphics.fillCircle(8, 8, 6);
 
         graphics.generateTexture(

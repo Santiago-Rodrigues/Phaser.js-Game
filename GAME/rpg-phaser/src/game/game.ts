@@ -1,10 +1,9 @@
-import { Scene } from "phaser"
+import { Input, Scene } from "phaser"
 import { Bullet } from "./bullets"
 import { Player, type PlayerCharacter } from "./player"
 import { Slime } from "./slime"
 import { Companion } from "./companion"
 
-type PartyCharacter = "kael" | "rian" | "lira"
 type GameMap =
   | "boss"
   | "corridor1"
@@ -35,6 +34,8 @@ export class GameScene extends Scene {
   private attackKey!: Phaser.Input.Keyboard.Key
   private interactKey!: Phaser.Input.Keyboard.Key
   private nextShotAt = 0
+  private playerHealth = 5
+  private nextContactDamageAt = 0
   private collisionLayer!:
     | Phaser.Tilemaps.TilemapLayer
     | Phaser.Tilemaps.TilemapGPULayer
@@ -57,6 +58,9 @@ export class GameScene extends Scene {
   init(data: { map?: GameMap; spawn?: MansionSpawn }): void {
     this.currentMap = data.map ?? "forest1"
     this.transitioning = false
+    this.nextShotAt = 0
+    this.nextContactDamageAt = 0
+    this.activeTransition = undefined
     this.bullets.length = 0
     this.slimes.length = 0
 
@@ -94,6 +98,14 @@ export class GameScene extends Scene {
       frameWidth: 64,
       frameHeight: 64,
     })
+
+    for (const name of ["Kael", "Rian", "Lira"]) {
+      this.load.spritesheet(`${name.toLowerCase()}-hurt`, `assets/protagonists/${name}/hurt.png`, {
+        frameWidth: 64,
+        frameHeight: 64,
+      })
+    }
+
     this.load.spritesheet("slime", "assets/npcs/enemies/Slime.png", {
       frameWidth: 98,
       frameHeight: 79,
@@ -115,7 +127,7 @@ export class GameScene extends Scene {
       this.load.image("boss-background", "assets/mansion/catacombs/sala_boss.png")
       this.load.tilemapTiledJSON(
         "mansion-boss",
-        "assets/mansion/sala_boss.json",
+        "assets/mansion/catacombs/sala_boss.json",
       )
     } else if (this.currentMap === "corridor1") {
       this.load.image("corridor1-background", "assets/mansion/catacombs/corredor1.png")
@@ -284,8 +296,29 @@ export class GameScene extends Scene {
       this.slimes.push(slime)
       this.playerLayer.add(slime.sprite)
       this.physics.add.collider(slime.sprite, this.collisionLayer)
-      this.physics.add.collider(this.player.sprite, slime.sprite)
+      this.physics.add.collider(this.player.sprite, slime.sprite, () => {
+        this.takeContactDamage(slime)
+      })
     })
+  }
+
+  private takeContactDamage(slime: Slime): void {
+    if (this.transitioning || this.time.now < this.nextContactDamageAt) {
+      return
+    }
+
+    this.playerHealth -= 1
+    this.nextContactDamageAt = this.time.now + 1000
+    this.player.playHurt(this.nextContactDamageAt)
+    slime.stopUntil(this.nextContactDamageAt)
+
+    if (this.playerHealth === 0) {
+      this.transitioning = true
+      this.time.delayedCall(Player.hurtDuration, () => {
+        this.playerHealth = 5
+        this.scene.restart({ map: this.currentMap })
+      })
+    }
   }
 
   private spawnForestSlimes(
@@ -586,16 +619,19 @@ export class GameScene extends Scene {
         map: "corridor1",
         spawn: "corridor1Top",
       })
+      return
     } else if (target === "corridor1ToBoss") {
       this.scene.restart({
         map: "boss",
         spawn: "bossBottom",
       })
+      return
     } else if (target === "corridor1ToCorridor2") {
       this.scene.restart({
         map: "corridor2",
         spawn: "corridor2Top",
       })
+      return
     } else if (target === "corridor2ToCorridor1") {
       this.scene.restart({
         map: "corridor1",
@@ -609,10 +645,35 @@ export class GameScene extends Scene {
         map: "mansionEntrance",
         spawn: "mansionEntranceFromForest3",
       })
+      return
+    }
+
+    this.transitioning = false
+  }
+
+  private swingSword(): void {
+    const playerBody = this.player.sprite.body
+    if (!playerBody) {
+      return
+    }
+
+    const reach = 8
+    for (const slime of this.slimes) {
+      const slimeBody = slime.sprite.body
+      if (
+        slime.sprite.active &&
+        slimeBody &&
+        slimeBody.left <= playerBody.right + reach &&
+        slimeBody.right >= playerBody.left - reach &&
+        slimeBody.top <= playerBody.bottom + reach &&
+        slimeBody.bottom >= playerBody.top - reach
+      ) {
+        slime.takeDamage()
+      }
     }
   }
 
-  private shoot(): void {
+  private shoot(character: "kael" | "lira"): void {
     if (this.time.now < this.nextShotAt) {
       return
     }
@@ -628,7 +689,8 @@ export class GameScene extends Scene {
     if (direction === "left") x -= offset
     if (direction === "right") x += offset
 
-    const bullet = new Bullet(this, x, y, direction)
+    const color = character === "kael" ? 0xff3030 : 0xff69b4
+    const bullet = new Bullet(this, x, y, direction, color)
     this.bullets.push(bullet)
     this.nextShotAt = this.time.now + 300
 
@@ -653,6 +715,13 @@ export class GameScene extends Scene {
   }
 
   update(): void {
+    if (this.transitioning) {
+      if (this.playerHealth === 0) {
+        this.player.update()
+      }
+      return
+    }
+
     const activeCharacter = this.registry.get(
       "activeCharacter",
     ) as PlayerCharacter
@@ -689,8 +758,13 @@ export class GameScene extends Scene {
       )
     }
 
-    if (this.attackKey.isDown) {
-      this.shoot()
+    const attackPressed = Input.Keyboard.JustDown(this.attackKey)
+    if (activeCharacter === "rian") {
+      if (attackPressed) {
+        this.swingSword()
+      }
+    } else if (this.attackKey.isDown) {
+      this.shoot(activeCharacter)
     }
 
     this.updateTransitionInteraction()

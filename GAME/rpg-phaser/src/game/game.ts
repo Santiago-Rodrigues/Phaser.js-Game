@@ -338,14 +338,7 @@ export class GameScene extends Scene {
     ) as PlayerCharacter
     const partyJoined = this.registry.get("partyJoined") === true
 
-    if (!partyJoined) {
-      this.companions.forEach((companion) => companion.sprite.destroy())
-      this.companions = []
-      this.partyCharacter = activeCharacter
-      return
-    }
-
-    if (this.partyCharacter === activeCharacter) {
+    if (!partyJoined || this.partyCharacter === activeCharacter) {
       return
     }
 
@@ -463,7 +456,6 @@ export class GameScene extends Scene {
     if (this.currentMap === "mansionEntrance") {
       this.createZone(396, 37, 95, 71, "mansionEntranceToForest3")
       this.createZone(636, 215, 55, 63, "mansionEntranceToMansion")
-      this.createZone(434, 653, 137, 99, "mansionParty")
     }
 
     if (this.currentMap === "boss") {
@@ -609,11 +601,6 @@ export class GameScene extends Scene {
       return
     }
 
-    if (target === "mansionParty") {
-      this.transitioning = false
-      return
-    }
-
     if (target === "bossToCorridor1") {
       this.scene.restart({
         map: "corridor1",
@@ -731,7 +718,10 @@ export class GameScene extends Scene {
     }
 
     this.player.update()
-    if (this.partyCharacter !== activeCharacter) {
+    if (
+      this.registry.get("partyJoined") === true &&
+      this.partyCharacter !== activeCharacter
+    ) {
       this.syncParty(this.player.sprite.x, this.player.sprite.y)
     }
 

@@ -10,7 +10,7 @@ export class Slime {
     this.sprite.setCollideWorldBounds(true)
 
     this.sprite.setOrigin(0.5, 0.5)
-    this.sprite.setScale(0.30)
+    this.sprite.setScale(0.60)
     this.sprite.setVelocity(0, 0)
   }
 

@@ -6,7 +6,7 @@ export class Player {
   character: PlayerCharacter
 
   private readonly controls: Controls
-  private readonly speed = 1100
+  private readonly speed = 800
   private facing: "up" | "down" | "left" | "right" = "down"
 
   constructor(

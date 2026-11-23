@@ -261,7 +261,7 @@ export class GameScene extends Scene {
       this.spawnSlimes([{ x: 400, y: 320 }])
     } else if (this.currentMap === "forest2") {
       this.spawnForestSlimes([
-        [532, 483, 158, 66],
+        [497, 512, 158, 66],
       ])
     } else if (this.currentMap === "forest3") {
       this.spawnForestSlimes([
@@ -271,7 +271,7 @@ export class GameScene extends Scene {
     } else if (this.currentMap === "mansionEntrance") {
       this.spawnForestSlimes([
         [450, 650, 40, 40],
-        [540, 650, 40, 40],
+        [525, 650, 40, 40],
       ])
     }
 
@@ -375,9 +375,9 @@ export class GameScene extends Scene {
 
     if (this.currentMap === "forest2") {
       if (spawn === "forest2FromForest3") {
-        return forestCenter(223, 118, 170, 81)
+        return forestCenter(200, 673, 181, 101)
       }
-      return forestCenter(353, 125, 150, 62)
+      return forestCenter(269,99,130,85)
     }
 
     if (this.currentMap === "forest3") {

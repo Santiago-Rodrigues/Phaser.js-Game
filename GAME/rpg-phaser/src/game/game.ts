@@ -34,7 +34,9 @@ export class GameScene extends Scene {
   private attackKey!: Phaser.Input.Keyboard.Key
   private interactKey!: Phaser.Input.Keyboard.Key
   private nextShotAt = 0
-  private playerHealth = 5
+  private readonly maxPlayerHealth = 5
+  private playerHealth = this.maxPlayerHealth
+  private healthHearts: Phaser.GameObjects.Image[] = []
   private nextContactDamageAt = 0
   private collisionLayer!:
     | Phaser.Tilemaps.TilemapLayer
@@ -75,6 +77,8 @@ export class GameScene extends Scene {
   }
 
   preload(): void {
+    this.load.image("player-heart", "assets/protagonists/heart.png")
+    this.load.image("enemy-health-frame", "assets/npcs/enemyBar.png")
     this.load.image("mansion-collider", "assets/mansion/bloco_colisao.png")
     this.load.image("forest1-background", "assets/forest/floresta1.png")
     this.load.image("forest2-background", "assets/forest/floresta2.png")
@@ -166,6 +170,13 @@ export class GameScene extends Scene {
     this.interactKey = keyboard.addKey("E")
 
     this.createMap()
+    this.healthHearts = Array.from({ length: this.maxPlayerHealth }, (_, index) =>
+      this.add.image(22 + index * 23, 22, "player-heart")
+        .setDisplaySize(36, 36)
+        .setScrollFactor(0)
+        .setDepth(200),
+    )
+    this.updatePlayerHealthHud()
 
     keyboard.on("keydown-M", () => {
       this.scene.pause("GameScene")
@@ -302,12 +313,19 @@ export class GameScene extends Scene {
     })
   }
 
+  private updatePlayerHealthHud(): void {
+    this.healthHearts.forEach((heart, index) => {
+      heart.setAlpha(index < this.playerHealth ? 1 : 0.25)
+    })
+  }
+
   private takeContactDamage(slime: Slime): void {
     if (this.transitioning || this.time.now < this.nextContactDamageAt) {
       return
     }
 
     this.playerHealth -= 1
+    this.updatePlayerHealthHud()
     this.nextContactDamageAt = this.time.now + 1000
     this.player.playHurt(this.nextContactDamageAt)
     slime.stopUntil(this.nextContactDamageAt)
@@ -315,7 +333,7 @@ export class GameScene extends Scene {
     if (this.playerHealth === 0) {
       this.transitioning = true
       this.time.delayedCall(Player.hurtDuration, () => {
-        this.playerHealth = 5
+        this.playerHealth = this.maxPlayerHealth
         this.scene.restart({ map: this.currentMap })
       })
     }

@@ -77,6 +77,8 @@ export class GameScene extends Scene {
   }
 
   preload(): void {
+    this.load.image("kael-projectile", "assets/protagonists/Kael/fireBall.png")
+    this.load.image("lira-projectile", "assets/protagonists/Lira/magic.png")
     this.load.image("player-heart", "assets/protagonists/heart.png")
     this.load.image("enemy-health-frame", "assets/npcs/enemyBar.png")
     this.load.image("mansion-collider", "assets/mansion/bloco_colisao.png")
@@ -694,8 +696,7 @@ export class GameScene extends Scene {
     if (direction === "left") x -= offset
     if (direction === "right") x += offset
 
-    const color = character === "kael" ? 0xff3030 : 0xff69b4
-    const bullet = new Bullet(this, x, y, direction, color)
+    const bullet = new Bullet(this, x, y, direction, character)
     this.bullets.push(bullet)
     this.nextShotAt = this.time.now + 300
 

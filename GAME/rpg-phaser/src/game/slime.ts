@@ -96,6 +96,7 @@ export class Slime {
 
     this.updateHealthBar()
     this.invulnerableUntil = now + Slime.damageCooldown
+    this.stopUntil(this.invulnerableUntil)
     this.sprite.setAlpha(0.35)
     return false
   }

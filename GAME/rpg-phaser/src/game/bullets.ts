@@ -1,77 +1,52 @@
-export type FacingDirection = 'up' | 'down' | 'left' | 'right';
+export type FacingDirection = "up" | "down" | "left" | "right"
+
+const directions = {
+  up: { x: 0, y: -1, angle: -90 },
+  down: { x: 0, y: 1, angle: 90 },
+  left: { x: -1, y: 0, angle: 180 },
+  right: { x: 1, y: 0, angle: 0 },
+}
+
+const projectileArt = {
+  kael: { originX: 0.8, originY: 0.51, angle: 0 },
+  lira: { originX: 0.2, originY: 0.56, angle: 180 },
+}
 
 export class Bullet {
-    readonly sprite: Phaser.Physics.Arcade.Sprite;
+  readonly sprite: Phaser.Physics.Arcade.Sprite
+  private readonly createdAt: number
 
-    constructor(
-        scene: Phaser.Scene,
-        x: number,
-        y: number,
-        direction: FacingDirection,
-        color: number,
-        speed = 360
-    ) {
-        this.createPlaceholderTexture(scene);
+  constructor(
+    scene: Phaser.Scene,
+    x: number,
+    y: number,
+    direction: FacingDirection,
+    character: keyof typeof projectileArt,
+    speed = 360,
+  ) {
+    const art = projectileArt[character]
+    const heading = directions[direction]
 
-        this.sprite = scene.physics.add.sprite(
-            x,
-            y,
-            'bullet-placeholder'
-        );
+    this.sprite = scene.physics.add.sprite(x, y, `${character}-projectile`)
+    this.sprite.setDisplaySize(64, 64)
+    this.sprite.setOrigin(art.originX, art.originY)
+    this.sprite.setAngle(heading.angle + art.angle)
 
-        this.sprite.setCollideWorldBounds(true);
-        this.sprite.setTint(color);
+    // Keep the collision body at the projectile's head, where the sprite pivots.
+    const bodySize = 16 / this.sprite.scaleX
+    this.sprite.setBodySize(bodySize, bodySize, false)
+    this.sprite.setOffset(
+      this.sprite.displayOriginX - bodySize / 2,
+      this.sprite.displayOriginY - bodySize / 2,
+    )
+    this.sprite.setCollideWorldBounds(true)
+    this.sprite.setVelocity(heading.x * speed, heading.y * speed)
+    this.createdAt = scene.time.now
+  }
 
-        const velocities: Record<
-            FacingDirection,
-            { x: number; y: number }
-        > = {
-            up: { x: 0, y: -1 },
-            down: { x: 0, y: 1 },
-            left: { x: -1, y: 0 },
-            right: { x: 1, y: 0 },
-        };
-
-        const velocity = velocities[direction];
-
-        this.sprite.setVelocity(
-            velocity.x * speed,
-            velocity.y * speed
-        );
-
-        this.sprite.setData(
-            'createdAt',
-            scene.time.now
-        );
+  update(scene: Phaser.Scene): void {
+    if (scene.time.now - this.createdAt >= 1500) {
+      this.sprite.disableBody(true, true)
     }
-
-    private createPlaceholderTexture(
-        scene: Phaser.Scene
-    ): void {
-        if (scene.textures.exists('bullet-placeholder')) {
-            return;
-        }
-
-        const graphics = scene.add.graphics();
-
-        graphics.fillStyle(0xffffff);
-        graphics.fillCircle(8, 8, 6);
-
-        graphics.generateTexture(
-            'bullet-placeholder',
-            16,
-            16
-        );
-
-        graphics.destroy();
-    }
-
-    update(scene: Phaser.Scene): void {
-        const age = scene.time.now
-            - this.sprite.getData('createdAt');
-
-        if (age >= 1500) {
-            this.sprite.disableBody(true, true);
-        }
-    }
+  }
 }

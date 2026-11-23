@@ -2,6 +2,9 @@ import { AUTO, Game } from "phaser"
 import type { Types } from "phaser"
 import { GameScene } from "./game"
 import { PartyMenu } from "./party-menu"
+import { Dialogue } from "./dialogue"
+import { ChapterEnd, Credits, Title } from "./title"
+import { PauseMenu } from "./pause-menu"
 
 const config: Types.Core.GameConfig = {
   type: AUTO,
@@ -20,7 +23,7 @@ const config: Types.Core.GameConfig = {
       debug: false,
     },
   },
-  scene: [GameScene, PartyMenu],
+  scene: [Title, PartyMenu, GameScene, PauseMenu, Dialogue, ChapterEnd, Credits],
 }
 
 const StartGame = (parent: string): Game => {

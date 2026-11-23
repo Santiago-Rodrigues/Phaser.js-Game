@@ -1,3 +1,4 @@
+import { gameplayNow } from "./gameplay-clock"
 export class Companion {
   readonly sprite: Phaser.Physics.Arcade.Sprite
 
@@ -74,7 +75,7 @@ export class Companion {
       up: [0, 1, 2, 3, 4, 5, 6, 7, 8],
     }
     const frameIndex =
-      Math.floor(this.sprite.scene.time.now / 150) % 9
+      Math.floor(gameplayNow(this.sprite.scene) / 150) % 9
     this.setCenteredFrame(walkingFrames[this.facing][frameIndex])
   }
 }

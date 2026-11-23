@@ -1,9 +1,11 @@
+import { gameplayNow, startGameplayClock } from "./gameplay-clock"
 import { Input, Scene } from "phaser"
 import { Bullet } from "./bullets"
 import { attackSheets, Player, type PlayerCharacter } from "./player"
 import { Slime } from "./slime"
 import { Companion } from "./companion"
 import { Gorga, gorgaSheets } from "./gorga"
+import type { CutsceneId } from "./dialogue"
 
 type Enemy = Slime | Gorga
 
@@ -42,6 +44,8 @@ export class GameScene extends Scene {
   private partyCharacter: PlayerCharacter | null = null
   private readonly enemies: Enemy[] = []
   private boss?: Gorga
+  private crystal?: Phaser.GameObjects.Image
+  private bossWarningShown = false
   private clearBossSpell?: () => void
   private readonly bullets: Bullet[] = []
   private attackKey!: Phaser.Input.Keyboard.Key
@@ -55,6 +59,7 @@ export class GameScene extends Scene {
     | Phaser.Tilemaps.TilemapGPULayer
   private currentMap: GameMap = "forest1"
   private transitioning = false
+  private pauseRequested = false
   private playerLayer!: Phaser.GameObjects.Container
   private projectileLayer!: Phaser.GameObjects.Container
   private activeTransition?: { target: string; label: string }
@@ -71,12 +76,18 @@ export class GameScene extends Scene {
 
   init(data: { map?: GameMap; spawn?: MansionSpawn }): void {
     this.currentMap = data.map ?? "forest1"
+    if (data.spawn === "forest1Start") {
+      this.playerHealth = this.maxPlayerHealth
+    }
     this.transitioning = false
+    this.pauseRequested = false
     this.nextContactDamageAt = 0
     this.activeTransition = undefined
     this.bullets.length = 0
     this.enemies.length = 0
     this.boss = undefined
+    this.crystal = undefined
+    this.bossWarningShown = false
     this.clearBossSpell = undefined
 
     this.companions = []
@@ -143,8 +154,18 @@ export class GameScene extends Scene {
         frameHeight: 64,
       })
     }
+    this.load.image("lunar-crystal", "assets/cristal_lunar.png")
     this.load.image("gorga-spell", "assets/npcs/elara/Gorga/spell.png")
     this.load.spritesheet("statue-walk", "assets/npcs/enemies/estatua/walk.png", {
+      frameWidth: 64,
+      frameHeight: 64,
+    })
+
+    this.load.spritesheet("statue-slash", "assets/npcs/enemies/estatua/slash_128.png", {
+      frameWidth: 128,
+      frameHeight: 128,
+    })
+    this.load.spritesheet("statue-hurt", "assets/npcs/enemies/estatua/hurt.png", {
       frameWidth: 64,
       frameHeight: 64,
     })
@@ -181,6 +202,7 @@ export class GameScene extends Scene {
   }
 
   create(): void {
+    startGameplayClock(this)
     this.playerLayer = this.add.container()
     this.projectileLayer = this.add.container()
     this.cameras.main.setBackgroundColor("#101820")
@@ -200,6 +222,11 @@ export class GameScene extends Scene {
 
     this.attackKey = keyboard.addKey("SPACE")
     this.interactKey = keyboard.addKey("E")
+    const pauseOnEscape = (event: KeyboardEvent) => {
+      if (!event.repeat) this.pauseGame()
+    }
+    keyboard.on("keydown-ESC", pauseOnEscape)
+    this.events.once("shutdown", () => keyboard.off("keydown-ESC", pauseOnEscape))
 
     this.createMap()
     this.healthHearts = Array.from({ length: this.maxPlayerHealth }, (_, index) =>
@@ -209,11 +236,60 @@ export class GameScene extends Scene {
         .setDepth(200),
     )
     this.updatePlayerHealthHud()
+    this.showMansionArrival()
+  }
 
-    keyboard.on("keydown-M", () => {
-      this.scene.pause("GameScene")
-      this.scene.launch("PartyMenu")
+  private pauseGame(): void {
+    if (this.pauseRequested || this.transitioning) return
+
+    this.pauseRequested = true
+    this.scene.pause()
+    this.scene.launch("PauseMenu", {
+      onResume: () => {
+        this.pauseRequested = false
+        this.interactWasDown = true
+        this.scene.resume()
+      },
     })
+  }
+
+  private showMansionArrival(): void {
+    if (this.currentMap !== "mansion" || this.registry.get("mansionBedroomVisited") === true) {
+      return
+    }
+
+    const spawn = this.registry.get("mansionSpawn")
+    if (spawn === "mansionHallFromReception") {
+      const notice = this.add.text(400, 24, "Vá para o quarto", {
+        fontSize: "20px",
+        color: "#ffffff",
+        backgroundColor: "#20263a",
+        padding: { x: 12, y: 6 },
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(210)
+      this.tweens.add({
+        targets: notice, alpha: 0, delay: 2400, duration: 350,
+        onComplete: () => notice.destroy(),
+      })
+    } else if (spawn === "mansionBedroomFromLeftDoor") {
+      this.transitioning = true
+      this.stopParty()
+      const shade = this.add.rectangle(400, 320, 800, 640, 0x070812, 0.9)
+        .setScrollFactor(0).setDepth(220)
+      const caption = this.add.text(400, 320, "Mais tarde naquela noite", {
+        fontFamily: "Georgia, serif", fontSize: "27px", color: "#fff0d5",
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(221)
+      this.tweens.add({
+        targets: [shade, caption], alpha: 0, delay: 1050, duration: 350,
+        onComplete: () => {
+          shade.destroy()
+          caption.destroy()
+          this.playDialogue("quarto_decisao", () => {
+            this.registry.set("mansionBedroomVisited", true)
+            this.transitioning = false
+          })
+        },
+      })
+    }
   }
 
   private createMap(): void {
@@ -325,12 +401,7 @@ export class GameScene extends Scene {
     this.player.sprite.setCollideWorldBounds(true)
 
     if (this.currentMap === "boss") {
-      this.boss = new Gorga(
-        this, 400, 260,
-        (x, y, dx, dy) => this.castBossSpell(x, y, dx, dy),
-        () => this.takeContactDamage(),
-      )
-      this.addEnemy(this.boss)
+      this.createLunarCrystal()
     } else if (this.currentMap === "mansion") {
       this.createReceptionist()
       if (
@@ -338,7 +409,8 @@ export class GameScene extends Scene {
         this.registry.get("mansionHallCleared") !== true &&
         this.registry.get("mansionHallAmbushStarted") === true
       ) {
-        this.spawnSlimes([{ x: 1424, y: 400 }, { x: 1568, y: 400 }])
+        this.addStatue(1424, 400)
+        this.addStatue(1568, 400)
       }
     } else if (this.currentMap === "corridor1" || this.currentMap === "corridor2") {
       this.spawnStatues(spawn)
@@ -361,6 +433,42 @@ export class GameScene extends Scene {
     this.createTransitionZones()
   }
 
+  private createLunarCrystal(): void {
+    this.crystal = this.add.image(400, 156, "lunar-crystal").setDisplaySize(88, 88).setDepth(8)
+  }
+
+  private collectLunarCrystal(): void {
+    if (!this.crystal) return
+    this.crystal.destroy()
+    this.crystal = undefined
+    this.boss = new Gorga(
+      this, 520, 260,
+      (x, y, dx, dy) => this.castBossSpell(x, y, dx, dy),
+      () => this.takeContactDamage(),
+    )
+    this.addEnemy(this.boss)
+  }
+
+  private stopParty(): void {
+    this.player.cancelAttack()
+    this.player.sprite.setVelocity(0, 0)
+    this.companions.forEach((companion) => companion.sprite.setVelocity(0, 0))
+  }
+
+  private playDialogue(id: CutsceneId, onComplete?: () => void): void {
+    this.stopParty()
+    this.scene.pause()
+    this.scene.launch("Dialogue", {
+      id,
+      onComplete: () => {
+        this.attackKey.reset()
+        this.interactWasDown = true
+        this.scene.resume()
+        onComplete?.()
+      },
+    })
+  }
+
   private spawnSlimes(points: Array<{ x: number; y: number }>): void {
     points.forEach((point) => {
       this.addEnemy(new Slime(this, point.x, point.y))
@@ -372,7 +480,7 @@ export class GameScene extends Scene {
     this.playerLayer.add(enemy.sprite)
     this.physics.add.collider(enemy.sprite, this.collisionLayer)
     this.physics.add.collider(this.player.sprite, enemy.sprite, () => {
-      if (enemy instanceof Slime) this.takeContactDamage(enemy)
+      if (enemy instanceof Slime && enemy.dealsContactDamage) this.takeContactDamage(enemy)
     })
   }
 
@@ -384,6 +492,10 @@ export class GameScene extends Scene {
       loop: true,
       callback: () => receptionist.setFrame(String(receptionist.frame.name) === "26" ? 27 : 26),
     })
+  }
+
+  private addStatue(x: number, y: number): void {
+    this.addEnemy(new Slime(this, x, y, () => this.takeContactDamage()))
   }
 
   private spawnStatues(spawn: { x: number; y: number }): void {
@@ -398,7 +510,7 @@ export class GameScene extends Scene {
     for (let count = 0; count < 3 && points.length > 0; count++) {
       const [point] = points.splice(Math.floor(Math.random() * points.length), 1)
       const [x, y] = point
-      this.addEnemy(new Slime(this, x, y, true))
+      this.addStatue(x, y)
     }
   }
 
@@ -438,13 +550,13 @@ export class GameScene extends Scene {
   }
 
   private takeContactDamage(slime?: Slime): void {
-    if (this.transitioning || this.boss?.locksParty || this.time.now < this.nextContactDamageAt) {
+    if (this.pauseRequested || this.transitioning || this.boss?.locksParty || gameplayNow(this) < this.nextContactDamageAt) {
       return
     }
 
     this.playerHealth -= 1
     this.updatePlayerHealthHud()
-    this.nextContactDamageAt = this.time.now + 1000
+    this.nextContactDamageAt = gameplayNow(this) + 1000
     this.player.playHurt(this.nextContactDamageAt)
     slime?.stopUntil(this.nextContactDamageAt)
 
@@ -607,7 +719,7 @@ export class GameScene extends Scene {
 
     if (this.currentMap === "forest3") {
       this.createZone(231, 113, 110, 64, "forest3ToForest2")
-      this.createZone(629, 542, 176, 88, "forest3ToMansionEntrance")
+      this.createZone(629, 542, 176, 88, "forest3ToMansionEntrance", "E  Ir ao pátio")
     }
 
     if (this.currentMap === "mansionEntrance") {
@@ -619,14 +731,15 @@ export class GameScene extends Scene {
       this.createZone(2472, 930, 144, 56, "mansionToOutside", "E  Sair da mansão")
       this.createZone(1616, 1000, 128, 64, "mansionReceptionDesk", "E  Falar na recepção")
       this.createZone(2000, 784, 128, 56, "mansionReceptionToHall", "E  Ir ao corredor")
-      this.createZone(1680, 376, 128, 52, "mansionHallToReception", "E  Voltar à recepção")
+      this.createZone(1680, 376, 128, 52, "mansionHallToReception", "E  Entrar na recepção")
       this.createZone(1080, 376, 128, 52, "mansionToCatacombs", "E  Entrar nas catacumbas")
       this.createZone(320, 1024, 112, 64, "mansionLeftDoorToBedroom", "E  Entrar no quarto")
-      this.createZone(424, 608, 112, 52, "mansionBedroomToHall", "E  Voltar ao corredor")
+      this.createZone(424, 608, 112, 52, "mansionBedroomToHall", "E  Ir ao corredor")
     }
 
     if (this.currentMap === "boss") {
       this.createZone(400, 550, 220, 40, "bossToCorridor1")
+      this.createZone(350, 169, 100, 76, "collectLunarCrystal", "E  Pegar o Cristal Lunar")
     }
 
     if (this.currentMap === "corridor1") {
@@ -636,7 +749,7 @@ export class GameScene extends Scene {
     }
 
     if (this.currentMap === "corridor2") {
-      this.createZone(368, 288, 96, 32, "corridor2ToCorridor1", "E  Voltar ao primeiro corredor")
+      this.createZone(368, 288, 96, 32, "corridor2ToCorridor1", "E  Ir ao Corredor 1")
       this.createZone(904, 1328, 120, 64, "corridor2ToMansionEntrance", "E  Sair das catacumbas")
     }
   }
@@ -693,7 +806,9 @@ export class GameScene extends Scene {
 
     this.transitionZones.forEach(({ zone, label, target }) => {
       const bounds = zone.getBounds()
-      const available = target !== "mansionReceptionDesk" || !spokeToReception
+      const available =
+        (target !== "mansionReceptionDesk" || !spokeToReception) &&
+        (target !== "collectLunarCrystal" || this.crystal !== undefined)
       const isInside = available && bounds.contains(
         this.player.sprite.x,
         this.player.sprite.y,
@@ -710,7 +825,7 @@ export class GameScene extends Scene {
       }
       if (target === "mansionToCatacombs") {
         const lockedMessage = this.registry.get("mansionHallAmbushStarted") === true
-          ? "Derrote os dois inimigos no corredor"
+          ? "Derrote as duas estátuas no corredor"
           : "A porta está trancada"
         label.setText(catacombsLocked ? lockedMessage : "E  Entrar nas catacumbas")
       }
@@ -740,16 +855,12 @@ export class GameScene extends Scene {
     }
 
     if (target === "mansionReceptionDesk") {
-      this.registry.set("mansionReceptionSpoken", true)
-      const dialogue = this.add.text(
-        1680, 985,
-        "Elora: Pode seguir pelo arco. A porta das catacumbas está trancada.",
-        {
-          fontSize: "17px", color: "#ffffff", backgroundColor: "#20263a",
-          padding: { x: 10, y: 6 }, wordWrap: { width: 330 },
-        },
-      ).setOrigin(0.5, 1).setDepth(100)
-      this.time.delayedCall(4200, () => dialogue.destroy())
+      this.playDialogue("3_conversa_elara", () => this.registry.set("mansionReceptionSpoken", true))
+      return
+    }
+
+    if (target === "collectLunarCrystal") {
+      this.collectLunarCrystal()
       return
     }
 
@@ -783,10 +894,18 @@ export class GameScene extends Scene {
           this.transitioning = false
         }
         return
-      case "mansionLeftDoorToBedroom":
-        this.registry.set("mansionBedroomVisited", true)
-        this.scene.restart({ map: "mansion", spawn: "mansionBedroomFromLeftDoor" })
+      case "mansionLeftDoorToBedroom": {
+        const enterBedroom = () => this.scene.restart({ map: "mansion", spawn: "mansionBedroomFromLeftDoor" })
+        if (this.registry.get("mansionBedroomVisited") === true) {
+          enterBedroom()
+        } else {
+          this.stopParty()
+          const camera = this.cameras.main
+          camera.once("camerafadeoutcomplete", enterBedroom)
+          camera.fadeOut(250)
+        }
         return
+      }
       case "mansionBedroomToHall":
         if (this.registry.get("mansionBedroomVisited") === true) {
           this.registry.set("mansionHallAmbushStarted", true)
@@ -950,6 +1069,8 @@ export class GameScene extends Scene {
   }
 
   update(): void {
+    if (this.pauseRequested) return
+
     if (this.transitioning) {
       if (this.playerHealth === 0) {
         this.player.update()
@@ -957,12 +1078,27 @@ export class GameScene extends Scene {
       return
     }
 
+    if (this.boss && !this.boss.sprite.active) {
+      this.transitioning = true
+      this.clearBossSpell?.()
+      this.playDialogue("5_ataque_cristal_lunar", () => {
+        this.playerHealth = 1
+        this.updatePlayerHealthHud()
+        const camera = this.cameras.main
+        camera.once("camerafadeoutcomplete", () => this.scene.start("ChapterEnd"))
+        camera.fadeOut(650)
+      })
+      return
+    }
+
     if (this.boss?.locksParty) {
       this.clearBossSpell?.()
-      this.player.cancelAttack()
-      this.player.sprite.setVelocity(0, 0)
-      this.companions.forEach((companion) => companion.sprite.setVelocity(0, 0))
+      this.stopParty()
       this.boss.update(this.player.sprite)
+      if (!this.boss.locksParty && !this.bossWarningShown) {
+        this.bossWarningShown = true
+        this.playDialogue("4_advertencia_gorga")
+      }
       return
     }
 
@@ -1008,11 +1144,11 @@ export class GameScene extends Scene {
       this.enemies.length === 2 &&
       this.enemies.every((slime) => !slime.sprite.active)
     ) {
-      this.registry.set("partyJoined", true)
-      this.syncParty(
-        this.player.sprite.x,
-        this.player.sprite.y,
-      )
+      this.playDialogue("2_encontro_irmaos", () => {
+        this.registry.set("partyJoined", true)
+        this.syncParty(this.player.sprite.x, this.player.sprite.y)
+      })
+      return
     }
 
     const attackPressed = Input.Keyboard.JustDown(this.attackKey)

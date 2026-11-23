@@ -1,3 +1,4 @@
+import { gameplayNow } from "./gameplay-clock"
 export class Slime {
   private static readonly damageCooldown = 1000
   readonly sprite: Phaser.Physics.Arcade.Sprite
@@ -10,8 +11,12 @@ export class Slime {
   private readonly maxSpeed = 70
   private stoppedUntil = 0
   private invulnerableUntil = 0
+  private slash?: { startedAt: number; row: number; didHit: boolean }
+  private nextSlashAt = 0
+  private hurtStartedAt?: number
 
-  constructor(scene: Phaser.Scene, x: number, y: number, private readonly statue = false) {
+  constructor(scene: Phaser.Scene, x: number, y: number, private readonly strike?: () => void) {
+    const statue = Boolean(strike)
     this.sprite = scene.physics.add.sprite(x, y, statue ? "statue-walk" : "slime", statue ? 26 : 0)
 
     this.sprite.setCollideWorldBounds(true)
@@ -38,6 +43,10 @@ export class Slime {
     this.updateHealthBar()
   }
 
+  get dealsContactDamage(): boolean {
+    return !this.strike
+  }
+
   stopUntil(time: number): void {
     this.stoppedUntil = time
     this.sprite.setVelocity(0, 0)
@@ -46,7 +55,20 @@ export class Slime {
 
   update(player: Phaser.Physics.Arcade.Sprite): void {
     this.healthBar.setPosition(this.sprite.x, this.sprite.y - 38)
-    const now = this.sprite.scene.time.now
+    const now = gameplayNow(this.sprite.scene)
+    if (this.hurtStartedAt !== undefined) {
+      const frame = Math.floor((now - this.hurtStartedAt) / 50)
+      if (frame < 6) {
+        this.sprite.setFrame(frame)
+      } else {
+        this.hurtStartedAt = undefined
+        if (this.health <= 0) {
+          this.defeat()
+          return
+        }
+        this.sprite.setTexture("statue-walk", 26)
+      }
+    }
     if (this.invulnerableUntil !== 0) {
       const remaining = this.invulnerableUntil - now
       if (remaining > 0) {
@@ -70,10 +92,11 @@ export class Slime {
     const distanceY = player.y - this.sprite.y
     const distance = Math.hypot(distanceX, distanceY)
 
-    if (this.statue) {
+    if (this.strike) {
       const row = Math.abs(distanceX) > Math.abs(distanceY)
         ? (distanceX < 0 ? 1 : 3)
         : (distanceY < 0 ? 0 : 2)
+      if (this.updateSlash(player, now, row, distance)) return
       this.sprite.setFrame(row * 13 + Math.floor(now / 130) % 9)
     }
 
@@ -88,17 +111,55 @@ export class Slime {
     )
   }
 
-  takeDamage(amount = 1): boolean {
-    const now = this.sprite.scene.time.now
-    if (!this.sprite.active || now < this.invulnerableUntil) {
+  private updateSlash(player: Phaser.Physics.Arcade.Sprite, now: number, row: number, distance: number): boolean {
+    if (!this.slash) {
+      if (distance > 88 || now < this.nextSlashAt) return false
+      this.slash = { startedAt: now, row, didHit: false }
+      this.nextSlashAt = now + 1200
+      this.sprite.setVelocity(0, 0)
+      this.sprite.setTexture("statue-slash", row * 6)
+      this.sprite.setOffset(45, 45)
+    }
+
+    const slash = this.slash
+    const frame = Math.floor((now - slash.startedAt) / 65)
+    if (frame >= 6) {
+      this.slash = undefined
+      this.sprite.setTexture("statue-walk", slash.row * 13)
+      this.sprite.setOffset(13, 13)
       return false
     }
 
-    this.health -= amount
+    this.sprite.setFrame(slash.row * 6 + frame)
+    if (frame >= 3 && !slash.didHit) {
+      slash.didHit = true
+      const dx = player.x - this.sprite.x
+      const dy = player.y - this.sprite.y
+      const forward = [-dy, -dx, dy, dx][slash.row]
+      const sideways = Math.abs(slash.row % 2 === 0 ? dx : dy)
+      if (forward >= 0 && forward <= 88 && sideways <= 44) this.strike?.()
+    }
+    return true
+  }
 
-    if (this.health <= 0) {
-      this.sprite.disableBody(true, true)
-      this.healthBar.destroy()
+  takeDamage(amount = 1): boolean {
+    const now = gameplayNow(this.sprite.scene)
+    if (!this.sprite.active || this.health <= 0 || now < this.invulnerableUntil) {
+      return false
+    }
+
+    this.health = Math.max(0, this.health - amount)
+
+    if (this.strike) {
+      this.slash = undefined
+      this.hurtStartedAt = now
+      this.sprite.setTexture("statue-hurt", 0)
+      this.sprite.setOffset(13, 13)
+      if (this.health === 0) this.sprite.disableBody(false, false)
+    }
+
+    if (this.health === 0 && !this.strike) {
+      this.defeat()
       return true
     }
 
@@ -106,7 +167,12 @@ export class Slime {
     this.invulnerableUntil = now + Slime.damageCooldown
     this.stopUntil(this.invulnerableUntil)
     this.sprite.setAlpha(0.35)
-    return false
+    return this.health === 0
+  }
+
+  private defeat(): void {
+    this.sprite.disableBody(true, true)
+    this.healthBar.destroy()
   }
 
   private updateHealthBar(): void {

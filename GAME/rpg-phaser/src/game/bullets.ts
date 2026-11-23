@@ -1,3 +1,4 @@
+import { gameplayNow } from "./gameplay-clock"
 export type FacingDirection = "up" | "down" | "left" | "right"
 
 const directions = {
@@ -41,11 +42,11 @@ export class Bullet {
     )
     this.sprite.setCollideWorldBounds(true)
     this.sprite.setVelocity(heading.x * speed, heading.y * speed)
-    this.createdAt = scene.time.now
+    this.createdAt = gameplayNow(scene)
   }
 
   update(scene: Phaser.Scene): void {
-    if (scene.time.now - this.createdAt >= 1500) {
+    if (gameplayNow(scene) - this.createdAt >= 1500) {
       this.sprite.disableBody(true, true)
     }
   }

@@ -1,3 +1,4 @@
+import { gameplayNow } from "./gameplay-clock"
 import { Controls } from "./controls"
 import type { FacingDirection } from "./bullets"
 
@@ -16,7 +17,7 @@ export class Player {
   character: PlayerCharacter
 
   private readonly controls: Controls
-  private readonly speed = 800
+  private readonly speed = 200
   private hurtStartedAt = 0
   private invulnerableUntil = 0
   private facing: FacingDirection = "down"
@@ -55,14 +56,14 @@ export class Player {
   playHurt(invulnerableUntil: number): void {
     this.attack = undefined
     this.sprite.setOffset(0, 0)
-    this.hurtStartedAt = this.sprite.scene.time.now
+    this.hurtStartedAt = gameplayNow(this.sprite.scene)
     this.invulnerableUntil = invulnerableUntil
     this.sprite.setVelocity(0, 0)
     this.updateHurt()
   }
 
   private updateHurt(): boolean {
-    const now = this.sprite.scene.time.now
+    const now = gameplayNow(this.sprite.scene)
     const elapsed = now - this.hurtStartedAt
 
     if (now < this.invulnerableUntil) {
@@ -86,7 +87,7 @@ export class Player {
     }
 
     const { frames, size } = attackSheets[this.character]
-    this.attack = { startedAt: this.sprite.scene.time.now, impact }
+    this.attack = { startedAt: gameplayNow(this.sprite.scene), impact }
     this.sprite.setVelocity(0, 0)
     this.sprite.setTexture(`${this.character}-attack`, attackRows[this.facing] * frames)
     this.sprite.setBodySize(64, 64, false)
@@ -106,7 +107,7 @@ export class Player {
     }
 
     const { frames } = attackSheets[this.character]
-    const frame = Math.floor((this.sprite.scene.time.now - this.attack.startedAt) / attackFrameDuration)
+    const frame = Math.floor((gameplayNow(this.sprite.scene) - this.attack.startedAt) / attackFrameDuration)
     if (frame < frames) {
       this.sprite.setFrame(attackRows[this.facing] * frames + frame)
       if (this.character === "rian" && frame >= 1 && frame <= 4) {
@@ -172,7 +173,7 @@ export class Player {
     }
 
     const frameIndex =
-      Math.floor(this.sprite.scene.time.now / 150) % 9
+      Math.floor(gameplayNow(this.sprite.scene) / 150) % 9
 
     this.setCenteredFrame(walkingFrames[this.facing][frameIndex])
   }

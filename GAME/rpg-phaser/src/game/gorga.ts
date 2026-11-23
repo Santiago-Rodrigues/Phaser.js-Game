@@ -1,3 +1,4 @@
+import { gameplayNow } from "./gameplay-clock"
 export const gorgaSheets = {
   "elara-idle": "idle.png",
   "gorga-walk": "Gorga/walk.png",
@@ -31,7 +32,7 @@ export class Gorga {
     private readonly castSpell: (x: number, y: number, dx: number, dy: number) => void,
     private readonly damagePlayer: () => void,
   ) {
-    this.startedAt = scene.time.now
+    this.startedAt = gameplayNow(scene)
     this.sprite = scene.physics.add.sprite(x, y, "elara-idle", 26)
       .setScale(1.5)
       .setCollideWorldBounds(true)
@@ -56,7 +57,7 @@ export class Gorga {
 
   private enter(state: State): void {
     this.state = state
-    this.startedAt = this.scene.time.now
+    this.startedAt = gameplayNow(this.scene)
     this.attackResolved = false
     this.sprite.setVelocity(0, 0)
     this.sprite.setImmovable(state === "hurt" || state === "combat")
@@ -75,7 +76,7 @@ export class Gorga {
   }
 
   update(player: Phaser.Physics.Arcade.Sprite): void {
-    const now = this.scene.time.now
+    const now = gameplayNow(this.scene)
     const elapsed = now - this.startedAt
     if (this.invulnerableUntil !== 0) {
       const remaining = this.invulnerableUntil - now
@@ -150,7 +151,7 @@ export class Gorga {
   }
 
   takeDamage(): boolean {
-    const now = this.scene.time.now
+    const now = gameplayNow(this.scene)
     if (!this.sprite.active || this.locksParty || now < this.invulnerableUntil) return false
     this.health -= 1
     this.invulnerableUntil = now + Gorga.damageCooldown

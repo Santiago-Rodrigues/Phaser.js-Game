@@ -1,6 +1,15 @@
 import { Controls } from "./controls"
+import type { FacingDirection } from "./bullets"
 
 export type PlayerCharacter = "kael" | "rian" | "lira"
+export const attackSheets = {
+  kael: { path: "Kael/thrust_oversize.png", size: 192, frames: 8 },
+  rian: { path: "Rian/halfslash_128.png", size: 128, frames: 6 },
+  lira: { path: "Lira/thrust_oversize.png", size: 192, frames: 8 },
+}
+const attackRows = { up: 0, left: 1, down: 2, right: 3 }
+const attackFrameDuration = 50
+
 export class Player {
   static readonly hurtDuration = 325
   readonly sprite: Phaser.Physics.Arcade.Sprite
@@ -10,7 +19,8 @@ export class Player {
   private readonly speed = 800
   private hurtStartedAt = 0
   private invulnerableUntil = 0
-  private facing: "up" | "down" | "left" | "right" = "down"
+  private facing: FacingDirection = "down"
+  private attack?: { startedAt: number; impact: () => void }
 
   constructor(
     scene: Phaser.Scene,
@@ -43,6 +53,8 @@ export class Player {
   }
 
   playHurt(invulnerableUntil: number): void {
+    this.attack = undefined
+    this.sprite.setOffset(0, 0)
     this.hurtStartedAt = this.sprite.scene.time.now
     this.invulnerableUntil = invulnerableUntil
     this.sprite.setVelocity(0, 0)
@@ -65,15 +77,53 @@ export class Player {
       this.invulnerableUntil = 0
     }
 
-    if (this.sprite.texture.key !== this.character) {
-      this.sprite.setTexture(this.character)
+    return false
+  }
+
+  startAttack(impact: () => void): void {
+    if (this.attack || this.sprite.texture.key === `${this.character}-hurt`) {
+      return
+    }
+
+    const { frames, size } = attackSheets[this.character]
+    this.attack = { startedAt: this.sprite.scene.time.now, impact }
+    this.sprite.setVelocity(0, 0)
+    this.sprite.setTexture(`${this.character}-attack`, attackRows[this.facing] * frames)
+    this.sprite.setBodySize(64, 64, false)
+    this.sprite.setOffset((size - 64) / 2, (size - 64) / 2)
+  }
+
+  private updateAttack(): boolean {
+    if (!this.attack) {
+      return false
+    }
+
+    const { frames } = attackSheets[this.character]
+    const frame = Math.floor((this.sprite.scene.time.now - this.attack.startedAt) / attackFrameDuration)
+    if (frame < frames) {
+      this.sprite.setFrame(attackRows[this.facing] * frames + frame)
+      if (this.character === "rian" && frame >= 1 && frame <= 4) {
+        this.attack.impact()
+      }
+      return true
+    }
+
+    const { impact } = this.attack
+    this.attack = undefined
+    this.sprite.setOffset(0, 0)
+    if (this.character !== "rian") {
+      impact()
     }
     return false
   }
 
   update(): void {
-    if (this.updateHurt()) {
+    if (this.updateHurt() || this.updateAttack()) {
       return
+    }
+
+    if (this.sprite.texture.key !== this.character) {
+      this.sprite.setTexture(this.character)
     }
 
     const movement = this.controls.getMovement()
@@ -125,9 +175,11 @@ export class Player {
   }
 
   setCharacter(character: PlayerCharacter): void {
+    this.attack = undefined
     this.character = character
     this.sprite.setTexture(character)
     this.sprite.setScale(1.5)
+    this.sprite.setOffset(0, 0)
     this.setCenteredFrame(0)
   }
 }
